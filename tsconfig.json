@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "outDir": "lib",
+        "module": "commonjs",
+        "lib": ["es6"],
+        "target": "es2016",
+        "declaration": true,
+        "experimentalDecorators": true,
+        "noImplicitAny": false,
+        "esModuleInterop": true,
+        "strict": true,
+        "sourceMap": false
+    },
+    "include": [
+      "src/server/**/*.ts"
+    ]
+}
