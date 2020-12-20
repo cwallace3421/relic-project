@@ -1,7 +1,9 @@
 import http from "http";
 import { Room, Client } from "colyseus";
-import { Entity } from "./Entity";
+import { Player } from "./Player";
 import { ArenaState } from "./ArenaState";
+import { onInit, onPlayerAuth, onPlayerJoin, onPlayerLeave, onTick } from "./ArenaLogic";
+import logger, { LogCodes } from "../../utils/logger";
 
 interface KeyboardMessage {
   isUpPressed: boolean;
@@ -14,47 +16,49 @@ export class ArenaRoom extends Room<ArenaState> {
 
   onCreate() {
     this.setState(new ArenaState());
-    this.state.initializeState();
 
-    this.onMessage("keyboard", this.onKeyboardMessage.bind(this));
+    onInit(this.state);
 
-    this.setSimulationInterval((delta: number) => this.state.updateState(delta));
+    this.onMessage("keyboard", (client: Client, message: KeyboardMessage) => {
+      this.onKeyboardMessage(client, message);
+    });
+
+    // Default - 60fps - 16.6 millis
+    this.setSimulationInterval(this.onRoomUpdate.bind(this), 16.66);
   }
 
   onAuth(client: Client, options: any, request: http.IncomingMessage) {
-    console.log(client);
-    console.log(options);
-    console.log(request);
-    request.headers.cookie;
-    return true;
+    return onPlayerAuth(client, options, request);
   }
 
   onJoin(client: Client, options: any) {
-    console.log("SERVER: Client joined.", { sessionId: client.sessionId });
-    this.state.createPlayer(client.sessionId);
+    onPlayerJoin(this.state, client, options);
   }
 
   onLeave(client: Client) {
-    console.log("SERVER: Client left.", { sessionId: client.sessionId });
-    const entity = this.state.entities[client.sessionId];
+    onPlayerLeave(this.state, client);
+  }
 
-    if (entity) {
-      entity.dead = true;
-    }
+  onRoomUpdate(delta: number) {
+    onTick(this.state, delta);
   }
 
   onKeyboardMessage(client: Client, message: KeyboardMessage) {
-    const entity = this.state.entities[client.sessionId] as Entity;
-
-    if (!entity || entity.dead === true) {
-      console.log("SERVER: Client is trying to send an update when it's dead.", { sessionId: client.sessionId });
-      return;
+    const player = this.state.players[client.sessionId] as Player;
+    if (!player || player.dead === true) {
+      logger.error("Player is trying to send an update when it's dead.", LogCodes.SERVER_PLAYER, { sessionId: client.sessionId });
+    } else {
+      player.assign({
+        isUpPressed: message.isUpPressed,
+        isDownPressed: message.isDownPressed,
+        isLeftPressed: message.isLeftPressed,
+        isRightPressed: message.isRightPressed,
+      });
+      // player.isUpPressed = message.isUpPressed;
+      // player.isDownPressed = message.isDownPressed;
+      // player.isLeftPressed = message.isLeftPressed;
+      // player.isRightPressed = message.isRightPressed;
     }
-
-    entity.isUpPressed = message.isUpPressed;
-    entity.isDownPressed = message.isDownPressed;
-    entity.isLeftPressed = message.isLeftPressed;
-    entity.isRightPressed = message.isRightPressed;
   }
 
 }

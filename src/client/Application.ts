@@ -118,7 +118,7 @@ export class Application extends PIXI.Application {
         const playerName = (window as any).custom.name;
         this.room = await this.client.joinOrCreate<ArenaState>(ROOM_NAME, { name: playerName });
 
-        this.room.state.entities.onAdd = (entity, sessionId: string) => {
+        this.room.state.players.onAdd = (entity, sessionId: string) => {
             const color = 0xFFFF0B;
 
             const graphics = new PIXI.Graphics();
@@ -140,6 +140,7 @@ export class Application extends PIXI.Application {
             }
 
             entity.onChange = (changes) => {
+                console.log("Player update.", { sessionId });
                 const color = 0xFFFF0B;
 
                 const graphics = this.serverEntityMap[sessionId];
@@ -154,7 +155,8 @@ export class Application extends PIXI.Application {
             }
         };
 
-        this.room.state.entities.onRemove = (_, sessionId: string) => {
+        this.room.state.players.onRemove = (_, sessionId: string) => {
+            console.log("Player left.", { sessionId });
             this.viewport.removeChild(this.serverEntityMap[sessionId]);
             this.serverEntityMap[sessionId].destroy();
             delete this.serverEntityMap[sessionId];
