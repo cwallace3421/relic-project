@@ -4,17 +4,15 @@ import { Client } from "colyseus";
 import { ArenaState } from "./ArenaState";
 import { Player } from "./Player";
 import logger, { LogCodes } from '../../utils/logger';
-
-const WORLD_SIZE = 500;
-const DEFAULT_PLAYER_SPEED = 1;
-const DEFAULT_PLAYER_RADIUS = 10;
+import constants from "../../utils/constants";
+import { Rocket } from "./Rocket";
 
 const onInit = (state: ArenaState) => {
   logger.info("Arena room created.", LogCodes.ARENA_ROOM);
 }
 
 const onPlayerAuth = (client: Client, options: any, request: http.IncomingMessage): boolean => {
-  return true;
+  return !!options.name;
 };
 
 const onPlayerJoin = (state: ArenaState, client: Client, options: any) => {
@@ -22,7 +20,8 @@ const onPlayerJoin = (state: ArenaState, client: Client, options: any) => {
 
   state.players.set(client.sessionId, new Player().assign({
     x: Math.random() * state.width,
-    y: Math.random() * state.height
+    y: Math.random() * state.height,
+    name: options.name
   }));
 };
 
@@ -35,8 +34,7 @@ const onPlayerLeave = (state: ArenaState, client: Client) => {
 };
 
 const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void => {
-  const speed = DEFAULT_PLAYER_SPEED;// * delta;
-    // console.log(speed);
+  const speed = constants.DEFAULT_PLAYER_SPEED; // * delta;
 
     if (player.isUpPressed === true) {
       player.y -= speed;
@@ -52,8 +50,8 @@ const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void 
       player.x += speed;
     }
 
-    const minBounds = DEFAULT_PLAYER_RADIUS;
-    const maxBounds = WORLD_SIZE - DEFAULT_PLAYER_RADIUS;
+    const minBounds = constants.DEFAULT_PLAYER_RADIUS;
+    const maxBounds = constants.WORLD_SIZE - constants.DEFAULT_PLAYER_RADIUS;
 
     if (player.y < minBounds) { player.y = minBounds; }
     if (player.y > maxBounds) { player.y = maxBounds; }
@@ -72,6 +70,41 @@ const onTick = (state: ArenaState, delta: number): void => {
       state.players.delete(sessionId);
     }
   });
+
+  if (state.rocket && state.rocket.active) {
+    onRocketUpdate(state);
+  }
 };
 
-export { onInit, onPlayerAuth, onPlayerJoin, onPlayerLeave, onPlayerUpdate, onTick };
+const onRocketSpawn = (state: ArenaState): void => {
+  if (state.players.size > 0) {
+    const targetId = state.players.keys[Math.floor(Math.random() * state.players.size)];
+    state.rocket = new Rocket().assign({
+      x: constants.WORLD_SIZE / 2,
+      y: constants.WORLD_SIZE / 2,
+      active: true,
+      targetId,
+    });
+  } else {
+    logger.error('Unable to spawn rocket as there is no players.', LogCodes.SERVER_ROCKET)
+  }
+};
+
+const onRocketUpdate = (state: ArenaState): void => {
+  const self = state.rocket;
+  const target = state.players.get(self.targetId);
+  if (target) {
+
+  }
+}
+
+export {
+  onInit,
+  onPlayerAuth,
+  onPlayerJoin,
+  onPlayerLeave,
+  onPlayerUpdate,
+  onTick,
+  onRocketSpawn,
+  onRocketUpdate
+  };

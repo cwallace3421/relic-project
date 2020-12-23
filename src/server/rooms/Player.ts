@@ -1,5 +1,5 @@
 import { Schema, type } from "@colyseus/schema";
-import { DEFAULT_PLAYER_RADIUS } from "./ArenaState";
+import constants from "../../utils/constants";
 
 export class Player extends Schema {
     @type("float64")
@@ -9,7 +9,7 @@ export class Player extends Schema {
     y!: number;
 
     @type("float32")
-    radius!: number;
+    radius: number = constants.DEFAULT_PLAYER_RADIUS;
 
     @type("boolean")
     isUpPressed: boolean = false;
@@ -29,10 +29,8 @@ export class Player extends Schema {
     @type("float64")
     speed = 0;
 
-    constructor() {
-        super();
-        this.radius = DEFAULT_PLAYER_RADIUS;
-    }
+    @type("string")
+    name!: string;
 
     static distance(a: Player, b: Player) {
         return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));

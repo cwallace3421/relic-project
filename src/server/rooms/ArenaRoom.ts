@@ -1,9 +1,10 @@
 import http from "http";
-import { Room, Client } from "colyseus";
+import { Room, Client, Delayed } from "colyseus";
 import { Player } from "./Player";
 import { ArenaState } from "./ArenaState";
-import { onInit, onPlayerAuth, onPlayerJoin, onPlayerLeave, onTick } from "./ArenaLogic";
+import { onInit, onPlayerAuth, onPlayerJoin, onPlayerLeave, onRocketSpawn, onTick } from "./ArenaLogic";
 import logger, { LogCodes } from "../../utils/logger";
+import constants from "../../utils/constants";
 
 interface KeyboardMessage {
   isUpPressed: boolean;
@@ -14,8 +15,11 @@ interface KeyboardMessage {
 
 export class ArenaRoom extends Room<ArenaState> {
 
+  public roundTimer!: Delayed;
+
   onCreate() {
     this.setState(new ArenaState());
+    this.clock.start();
 
     onInit(this.state);
 
@@ -23,8 +27,18 @@ export class ArenaRoom extends Room<ArenaState> {
       this.onKeyboardMessage(client, message);
     });
 
+    this.onMessage("ping", (client: Client, message: any) => {
+      message.messageRecievedByServer = Date.now();
+      message.messageSentToClient = Date.now();
+      client.send('pong', message);
+    });
+
+    this.roundTimer = this.clock.setTimeout(() => {
+      onRocketSpawn(this.state);
+    }, 2000);
+
     // Default - 60fps - 16.6 millis
-    this.setSimulationInterval(this.onRoomUpdate.bind(this), 16.66);
+    this.setSimulationInterval(this.onRoomUpdate.bind(this), constants.SIMULATION_TICK_RATE);
   }
 
   onAuth(client: Client, options: any, request: http.IncomingMessage) {
@@ -54,10 +68,6 @@ export class ArenaRoom extends Room<ArenaState> {
         isLeftPressed: message.isLeftPressed,
         isRightPressed: message.isRightPressed,
       });
-      // player.isUpPressed = message.isUpPressed;
-      // player.isDownPressed = message.isDownPressed;
-      // player.isLeftPressed = message.isLeftPressed;
-      // player.isRightPressed = message.isRightPressed;
     }
   }
 

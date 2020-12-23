@@ -8,6 +8,7 @@ export enum LogLevels {
 export enum LogCodes {
   ARENA_ROOM = "ARENA_ROOM",
   SERVER_PLAYER = "SERVER_PLAYER",
+  SERVER_ROCKET = "SERVER_ROCKET",
 }
 
 const log = (level: LogLevels, message: string, logCode: LogCodes, data?: any): void => {
