@@ -27,6 +27,6 @@ export class ArenaState extends Schema {
   @type({ map: Player })
   players: MapSchema<Player> = new MapSchema<Player>();
 
-  @type(Rocket)
-  rocket: Rocket = new Rocket();
+  @type({ map: Rocket })
+  rockets: MapSchema<Rocket> = new MapSchema<Rocket>();
 }

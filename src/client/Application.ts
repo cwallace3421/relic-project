@@ -3,6 +3,7 @@ import * as Viewport from "pixi-viewport";
 import { Room, Client } from "colyseus.js";
 import { ArenaState } from "../server/rooms/ArenaState";
 import constants from "../utils/constants";
+import { lerp } from "../utils/vector";
 
 const ENDPOINT = (process.env.NODE_ENV !== "production")
   ? "ws://localhost:8080"
@@ -30,7 +31,7 @@ interface KeyboardState {
 
 export class Application extends PIXI.Application {
   serverPlayerMap: ServerEntityMap = {};
-  serverRocket: PIXI.Graphics;
+  serverRocketMap: ServerEntityMap = {};
   clientEntity: PIXI.Graphics;
 
   client: Client = new Client(ENDPOINT);
@@ -139,41 +140,26 @@ export class Application extends PIXI.Application {
       playerNameText.anchor.set(0.5, 1);
       playerNameText.position.set(0, -(entity.radius * 2));
 
-      const graphics = new PIXI.Graphics();
-      graphics.lineStyle(0);
-      graphics.beginFill(color);
-      graphics.drawCircle(0, 0, entity.radius);
-      graphics.endFill();
+      const playerGraphics = new PIXI.Graphics();
+      playerGraphics.lineStyle(0);
+      playerGraphics.beginFill(color);
+      playerGraphics.drawCircle(0, 0, entity.radius);
+      playerGraphics.endFill();
 
-      graphics.x = entity.x;
-      graphics.y = entity.y;
+      playerGraphics.x = entity.x;
+      playerGraphics.y = entity.y;
 
-      graphics.addChild(playerNameText);
+      playerGraphics.addChild(playerNameText);
 
-      this.viewport.addChild(graphics);
+      this.viewport.addChild(playerGraphics);
 
-      this.serverPlayerMap[sessionId] = graphics;
+      this.serverPlayerMap[sessionId] = playerGraphics;
 
       // detecting current user
       if (sessionId === this.room.sessionId) {
-        this.clientEntity = graphics;
+        this.clientEntity = playerGraphics;
         // this.viewport.follow(this.clientEntity);
       }
-
-      // entity.onChange = (changes) => {
-      // console.log("Player update.", { sessionId });
-      // const color = 0xFFFF0B;
-
-      // const graphics = this.serverPlayerMap[sessionId];
-      // graphics.x = entity.x;
-      // graphics.y = entity.y;
-
-      // graphics.clear();
-      // graphics.lineStyle(0);
-      // graphics.beginFill(color, 0.5);
-      // graphics.drawCircle(0, 0, entity.radius);
-      // graphics.endFill();
-      // }
     };
 
     this.room.state.players.onRemove = (_, sessionId: string) => {
@@ -182,6 +168,27 @@ export class Application extends PIXI.Application {
       this.serverPlayerMap[sessionId].destroy();
       delete this.serverPlayerMap[sessionId];
     };
+
+    this.room.state.rockets.onAdd = (rocket, rocketId: string) => {
+      const gfx = new PIXI.Graphics();
+
+      gfx.lineStyle(0);
+      gfx.beginFill(0xFF0000);
+      gfx.drawCircle(0, 0, rocket.radius);
+      gfx.endFill();
+
+      gfx.x = rocket.x;
+      gfx.y = rocket.y;
+
+      this.viewport.addChild(gfx);
+      this.serverRocketMap[rocketId] = gfx;
+    };
+
+    this.room.state.rockets.onRemove = (_, rocketId: string) => {
+      this.viewport.removeChild(this.serverRocketMap[rocketId]);
+      this.serverRocketMap[rocketId].destroy();
+      delete this.serverRocketMap[rocketId];
+    }
 
     // Ping Pong
     {
@@ -216,40 +223,35 @@ export class Application extends PIXI.Application {
 
     let oldX = 0, oldY = 0;
     let targetX = 0, targetY = 0;
+    let newPos = { x: 0, y: 0 };
+
     for (let id in this.serverPlayerMap) {
       ({ x: oldX, y: oldY } = this.serverPlayerMap[id]);
       ({ x: targetX, y: targetY } = this.room.state.players.get(id));
 
-      const xDiff = Math.abs(targetX - oldX);
-      const yDiff = Math.abs(targetY - oldY);
+      newPos = lerp(oldX, oldY, targetX, targetY, 0.2, 0.1);
+      this.serverPlayerMap[id].x = newPos.x;
+      this.serverPlayerMap[id].y = newPos.y
+    }
 
-      if (xDiff > 15 || yDiff > 15) {
-        // This threshold was randomly chosen, just to make sure that the difference isn't growing. And the the lerp is keeping up mostly.
-        console.error('Lerping is not catching up', {xDiff, yDiff});
-      }
+    for (let id in this.serverRocketMap) {
+      ({ x: oldX, y: oldY } = this.serverRocketMap[id]);
+      ({ x: targetX, y: targetY } = this.room.state.rockets.get(id));
 
-      // Where do we get the lerp t value of 0.2 from? The t value is a percentage of the difference. 0.5 = move 50% between the current and target.
-
-      if (xDiff < 0.1) {
-        this.serverPlayerMap[id].x = targetX;
-      } else {
-        this.serverPlayerMap[id].x = lerp(oldX, targetX, 0.2);
-      }
-
-      if (yDiff < 0.1) {
-        this.serverPlayerMap[id].y = targetY;
-      } else {
-        this.serverPlayerMap[id].y = lerp(oldY, targetY, 0.2);
-      }
+      newPos = lerp(oldX, oldY, targetX, targetY, 0.2, 0.1);
+      this.serverRocketMap[id].x = newPos.x;
+      this.serverRocketMap[id].y = newPos.y;
     }
 
     // Calculate average ping for outgoing and incoming packets
-    if (this.pingArray.length === 10) {
-      const outgoing: Array<number> = this.pingArray.map((ping) => ping.messageRecievedByServer - ping.messageSentToServer);
-      const incoming: Array<number> = this.pingArray.map((ping) => ping.messageRecievedByClient - ping.messageSentToClient);
-      const outgoingAverage = outgoing.reduce((p, c) => p + c) / 10;
-      const incomingAverage = incoming.reduce((p, c) => p + c) / 10;
-      this.pingText.text = `${outgoingAverage} ms - out\n${incomingAverage} ms - in`;
+    {
+      if (this.pingArray.length === 10) {
+        const outgoing: Array<number> = this.pingArray.map((ping) => ping.messageRecievedByServer - ping.messageSentToServer);
+        const incoming: Array<number> = this.pingArray.map((ping) => ping.messageRecievedByClient - ping.messageSentToClient);
+        const outgoingAverage = outgoing.reduce((p, c) => p + c) / 10;
+        const incomingAverage = incoming.reduce((p, c) => p + c) / 10;
+        this.pingText.text = `${outgoingAverage} ms - out\n${incomingAverage} ms - in`;
+      }
     }
   }
 
@@ -274,4 +276,4 @@ export class Application extends PIXI.Application {
   // }
 }
 
-export const lerp = (a: number, b: number, t: number) => (b - a) * t + a;
+const lerp_old = (a: number, b: number, t: number) => (b - a) * t + a;
