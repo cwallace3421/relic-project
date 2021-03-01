@@ -37,7 +37,12 @@ export class ArenaRoom extends Room<ArenaState> {
       onRocketSpawn(this.state);
     }, 2000);
 
-    // Default - 60fps - 16.6 millis
+    // Set network patch rate, sends out state updates of the world to the clients.
+    // 20 fps - 50 ms
+    // this.setPatchRate(constants.NETWORK_BROADCAST_RATE);
+
+    // Set simulation interval, runs the tick loop for the server world.
+    // 60 fps - 16.6 ms
     this.setSimulationInterval(this.onRoomUpdate.bind(this), constants.SIMULATION_TICK_RATE);
   }
 

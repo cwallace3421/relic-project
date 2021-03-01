@@ -22,8 +22,10 @@ const onInit = (state: ArenaState) => {
 }
 
 const onTick = (state: ArenaState, delta: number): void => {
+  const deltaTime: number = delta / 1000;
+
   state.players.forEach((player, sessionId) => {
-    onPlayerUpdate(sessionId, player, delta);
+    onPlayerUpdate(sessionId, player, deltaTime);
   });
 
   state.players.forEach((player, sessionId) => {
@@ -35,7 +37,7 @@ const onTick = (state: ArenaState, delta: number): void => {
   if (state.rockets.size > 0) {
     state.rockets.forEach((rocket, rocketId) => {
       if (rocket.active) {
-        onRocketUpdate(state, rocketId);
+        onRocketUpdate(state, rocketId, deltaTime);
       }
     });
 
@@ -48,7 +50,7 @@ const onTick = (state: ArenaState, delta: number): void => {
 
   if (constants.BOT_ENABLED) {
     state.bots.forEach((bot, botId) => {
-      onBotUpdate(state, botId);
+      onBotUpdate(state, botId, deltaTime);
     })
   }
 };
@@ -76,7 +78,7 @@ const onPlayerLeave = (state: ArenaState, client: Client) => {
 };
 
 const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void => {
-  const speed = constants.PLAYER_SPEED; // * delta;
+  const speed = constants.PLAYER_SPEED * delta;
 
   let dir = { x: 0, y: 0 };
 
@@ -126,8 +128,8 @@ const onRocketSpawn = (state: ArenaState): void => {
   }
 };
 
-const onRocketUpdate = (state: ArenaState, rocketId: string): void => {
-  const speed = constants.ROCKET_START_SPEED;
+const onRocketUpdate = (state: ArenaState, rocketId: string, delta: number): void => {
+  const speed = constants.ROCKET_START_SPEED * delta;
   const rocket = state.rockets.get(rocketId);
 
   const targetId = rocket.targetId;
@@ -179,7 +181,7 @@ const onBotSpawn = (state: ArenaState) => {
   }));
 };
 
-const onBotUpdate = (state: ArenaState, botId: string) => {
+const onBotUpdate = (state: ArenaState, botId: string, delta: number) => {
   const thisBot = state.bots.get(botId);
   const changeTargetChance = Math.floor(Math.random() * 200);
   if (changeTargetChance > 198) {
@@ -189,7 +191,7 @@ const onBotUpdate = (state: ArenaState, botId: string) => {
     });
   }
 
-  const speed = constants.PLAYER_SPEED;
+  const speed = constants.PLAYER_SPEED * delta;
   const dirX = thisBot.targetX - thisBot.x;
   const dirY = thisBot.targetY - thisBot.y;
 
