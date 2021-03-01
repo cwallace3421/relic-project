@@ -9,7 +9,7 @@ export class Player extends Schema {
     y!: number;
 
     @type("float32")
-    radius: number = constants.DEFAULT_PLAYER_RADIUS;
+    radius: number = constants.PLAYER_RADIUS;
 
     @type("boolean")
     isUpPressed: boolean = false;

@@ -9,7 +9,7 @@ export class Rocket extends Schema {
     y!: number;
 
     @type("float32")
-    radius: number = constants.DEFAULT_ROCKET_RADIUS;
+    radius: number = constants.ROCKET_RADIUS;
 
     @type("float64")
     speed = 0;

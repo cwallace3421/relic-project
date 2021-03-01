@@ -7,10 +7,18 @@ import logger, { LogCodes } from '../../utils/logger';
 import constants from "../../utils/constants";
 import { distance, normalize } from '../../utils/vector';
 import { circle } from '../../utils/collision';
+import { getRandomBotName } from '../../utils/botnames';
 import { Rocket } from "./Rocket";
+import { Bot } from "./Bot";
 
 const onInit = (state: ArenaState) => {
   logger.info("Arena room created.", LogCodes.ARENA_ROOM);
+
+  if (constants.BOT_ENABLED) {
+    for (let i = 0; i < constants.BOT_COUNT; i++) {
+      onBotSpawn(state);
+    }
+  }
 }
 
 const onTick = (state: ArenaState, delta: number): void => {
@@ -37,6 +45,12 @@ const onTick = (state: ArenaState, delta: number): void => {
       }
     });
   }
+
+  if (constants.BOT_ENABLED) {
+    state.bots.forEach((bot, botId) => {
+      onBotUpdate(state, botId);
+    })
+  }
 };
 
 const onPlayerAuth = (client: Client, options: any, request: http.IncomingMessage): boolean => {
@@ -62,7 +76,7 @@ const onPlayerLeave = (state: ArenaState, client: Client) => {
 };
 
 const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void => {
-  const speed = constants.DEFAULT_PLAYER_SPEED; // * delta;
+  const speed = constants.PLAYER_SPEED; // * delta;
 
   let dir = { x: 0, y: 0 };
 
@@ -85,8 +99,8 @@ const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void 
   player.x += speed * dir.x;
   player.y += speed * dir.y;
 
-  const minBounds = constants.DEFAULT_PLAYER_RADIUS;
-  const maxBounds = constants.WORLD_SIZE - constants.DEFAULT_PLAYER_RADIUS;
+  const minBounds = player.radius;
+  const maxBounds = constants.WORLD_SIZE - player.radius;
 
   if (player.y < minBounds) { player.y = minBounds; }
   if (player.y > maxBounds) { player.y = maxBounds; }
@@ -96,11 +110,11 @@ const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void 
 };
 
 const onRocketSpawn = (state: ArenaState): void => {
-  logger.info('Attempting to spawn one rocket', LogCodes.SERVER_ROCKET);
+  logger.info('Attempting to spawn one rocket.', LogCodes.SERVER_ROCKET);
   if (state.players.size > 0) {
     const rocketId = generateId();
     const targetId = getRandomPlayerId(state);
-    logger.info('Rocket has got target of', LogCodes.SERVER_ROCKET, { rocketId, targetId });
+    logger.info('Rocket has got target.', LogCodes.SERVER_ROCKET, { rocketId, targetId });
     state.rockets.set(rocketId, new Rocket().assign({
       x: constants.WORLD_SIZE / 2,
       y: constants.WORLD_SIZE / 2,
@@ -113,18 +127,18 @@ const onRocketSpawn = (state: ArenaState): void => {
 };
 
 const onRocketUpdate = (state: ArenaState, rocketId: string): void => {
-  const speed = constants.DEFAULT_ROCKET_START_SPEED;
+  const speed = constants.ROCKET_START_SPEED;
   const rocket = state.rockets.get(rocketId);
 
   const targetId = rocket.targetId;
   if (!targetId) {
-    logger.error('Rocket does not have a populated target', LogCodes.SERVER_ROCKET, { rocketId });
+    logger.error('Rocket does not have a populated target.', LogCodes.SERVER_ROCKET, { rocketId });
     return;
   }
 
   const targetPlayer = state.players.get(targetId);
   if (!targetPlayer) {
-    logger.error('Rocket target id does not point to a existing player', LogCodes.SERVER_ROCKET, { rocketId, targetId });
+    logger.error('Rocket target id does not point to a existing player.', LogCodes.SERVER_ROCKET, { rocketId, targetId });
     return;
   }
 
@@ -143,9 +157,59 @@ const onRocketUpdate = (state: ArenaState, rocketId: string): void => {
     if (newTargetId) {
       rocket.assign({ targetId: newTargetId });
     } else {
-      logger.error('Unable to get new target for rocket, destorying rocket', LogCodes.SERVER_ROCKET, { rocketId });
+      logger.error('Unable to get new target for rocket, destorying rocket.', LogCodes.SERVER_ROCKET, { rocketId });
       rocket.assign({active: false});
     }
+  }
+};
+
+const onBotSpawn = (state: ArenaState) => {
+  const difficulty = Math.floor(Math.random() * 8);
+  const botId = generateId();
+  const botName = getRandomBotName(` (D:${difficulty})`);
+
+  logger.info("Bot joined room.", LogCodes.SERVER_BOT, { botId, botName, difficulty });
+  state.bots.set(botId, new Bot().assign({
+    x: Math.random() * state.width,
+    y: Math.random() * state.height,
+    targetX: Math.random() * state.width,
+    targetY: Math.random() * state.height,
+    difficulty: difficulty,
+    name: botName
+  }));
+};
+
+const onBotUpdate = (state: ArenaState, botId: string) => {
+  const thisBot = state.bots.get(botId);
+  const changeTargetChance = Math.floor(Math.random() * 200);
+  if (changeTargetChance > 198) {
+    thisBot.assign({
+      targetX: Math.random() * state.width,
+      targetY: Math.random() * state.height,
+    });
+  }
+
+  const speed = constants.PLAYER_SPEED;
+  const dirX = thisBot.targetX - thisBot.x;
+  const dirY = thisBot.targetY - thisBot.y;
+
+  const dir = normalize(dirX, dirY);
+
+  thisBot.x += speed * dir.x;
+  thisBot.y += speed * dir.y;
+
+  const minBounds = thisBot.radius;
+  const maxBounds = constants.WORLD_SIZE - thisBot.radius;
+
+  if (thisBot.y < minBounds) { thisBot.y = minBounds; }
+  if (thisBot.y > maxBounds) { thisBot.y = maxBounds; }
+
+  if (thisBot.x < minBounds) { thisBot.x = minBounds; }
+  if (thisBot.x > maxBounds) { thisBot.x = maxBounds; }
+
+  if (distance(thisBot.x, thisBot.y, thisBot.targetX, thisBot.targetY) < 1) {
+    thisBot.x = thisBot.targetX;
+    thisBot.y = thisBot.targetY;
   }
 };
 

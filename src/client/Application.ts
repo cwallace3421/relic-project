@@ -31,6 +31,7 @@ interface KeyboardState {
 
 export class Application extends PIXI.Application {
   serverPlayerMap: ServerEntityMap = {};
+  serverBotMap: ServerEntityMap = {};
   serverRocketMap: ServerEntityMap = {};
   clientEntity: PIXI.Graphics;
 
@@ -130,7 +131,7 @@ export class Application extends PIXI.Application {
     this.room = await this.client.joinOrCreate<ArenaState>(constants.ROOM_NAME, { name: playerName });
 
     this.room.state.players.onAdd = (entity, sessionId: string) => {
-      const color = 0xFFFF0B;
+      const playerGraphics = this.createCircleInViewport(0xFFFF0B, entity.x, entity.y, entity.radius);
 
       const playerNameText = new PIXI.Text(entity.name, new PIXI.TextStyle({
         fill: "white",
@@ -139,19 +140,7 @@ export class Application extends PIXI.Application {
       }));
       playerNameText.anchor.set(0.5, 1);
       playerNameText.position.set(0, -(entity.radius * 2));
-
-      const playerGraphics = new PIXI.Graphics();
-      playerGraphics.lineStyle(0);
-      playerGraphics.beginFill(color);
-      playerGraphics.drawCircle(0, 0, entity.radius);
-      playerGraphics.endFill();
-
-      playerGraphics.x = entity.x;
-      playerGraphics.y = entity.y;
-
       playerGraphics.addChild(playerNameText);
-
-      this.viewport.addChild(playerGraphics);
 
       this.serverPlayerMap[sessionId] = playerGraphics;
 
@@ -169,19 +158,25 @@ export class Application extends PIXI.Application {
       delete this.serverPlayerMap[sessionId];
     };
 
+    this.room.state.bots.onAdd = (entity, botId) => {
+      const botGraphics = this.createCircleInViewport(0xFF550B, entity.x, entity.y, entity.radius);
+
+      const botNameText = new PIXI.Text(entity.name, new PIXI.TextStyle({
+        fill: "white",
+        align: "center",
+        fontSize: 12
+      }));
+      botNameText.anchor.set(0.5, 1);
+      botNameText.position.set(0, -(entity.radius * 2));
+      botGraphics.addChild(botNameText);
+
+      this.serverBotMap[botId] = botGraphics;
+    };
+
     this.room.state.rockets.onAdd = (rocket, rocketId: string) => {
-      const gfx = new PIXI.Graphics();
+      const rocketGfx = this.createCircleInViewport(0xFF0000, rocket.x, rocket.y, rocket.radius);
 
-      gfx.lineStyle(0);
-      gfx.beginFill(0xFF0000);
-      gfx.drawCircle(0, 0, rocket.radius);
-      gfx.endFill();
-
-      gfx.x = rocket.x;
-      gfx.y = rocket.y;
-
-      this.viewport.addChild(gfx);
-      this.serverRocketMap[rocketId] = gfx;
+      this.serverRocketMap[rocketId] = rocketGfx;
     };
 
     this.room.state.rockets.onRemove = (_, rocketId: string) => {
@@ -225,6 +220,7 @@ export class Application extends PIXI.Application {
     let targetX = 0, targetY = 0;
     let newPos = { x: 0, y: 0 };
 
+    // Lerp the player positions
     for (let id in this.serverPlayerMap) {
       ({ x: oldX, y: oldY } = this.serverPlayerMap[id]);
       ({ x: targetX, y: targetY } = this.room.state.players.get(id));
@@ -234,6 +230,17 @@ export class Application extends PIXI.Application {
       this.serverPlayerMap[id].y = newPos.y
     }
 
+    // Lerp the bot positions
+    for (let id in this.serverBotMap) {
+      ({ x: oldX, y: oldY } = this.serverBotMap[id]);
+      ({ x: targetX, y: targetY } = this.room.state.bots.get(id));
+
+      newPos = lerp(oldX, oldY, targetX, targetY, 0.2, 0.1);
+      this.serverBotMap[id].x = newPos.x;
+      this.serverBotMap[id].y = newPos.y
+    }
+
+    // Lerp the rocket positions
     for (let id in this.serverRocketMap) {
       ({ x: oldX, y: oldY } = this.serverRocketMap[id]);
       ({ x: targetX, y: targetY } = this.room.state.rockets.get(id));
@@ -253,6 +260,18 @@ export class Application extends PIXI.Application {
         this.pingText.text = `${outgoingAverage} ms - out\n${incomingAverage} ms - in`;
       }
     }
+  }
+
+  createCircleInViewport(color: number, x: number, y: number, r: number): PIXI.Graphics {
+    const gfx = new PIXI.Graphics();
+    gfx.lineStyle(0);
+    gfx.beginFill(color);
+    gfx.drawCircle(0, 0, r);
+    gfx.endFill();
+    gfx.x = x;
+    gfx.y = y;
+    this.viewport.addChild(gfx);
+    return gfx;
   }
 
   // set interpolation (bool: boolean) {

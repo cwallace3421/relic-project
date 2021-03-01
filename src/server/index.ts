@@ -58,7 +58,8 @@ gameServer.define(constants.ROOM_NAME, ArenaRoom);
 gameServer.listen(port);
 
 if (process.env.NODE_ENV !== "production") {
-  gameServer.simulateLatency(100);
+  const latencyOffset = Math.floor(Math.random() * 40);
+  gameServer.simulateLatency(100 - latencyOffset);
 }
 
 console.log(`Listening on http://${endpoint}:${port}`);

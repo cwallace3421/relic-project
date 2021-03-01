@@ -4,6 +4,7 @@ import { Schema, type, MapSchema, filterChildren } from "@colyseus/schema";
 import { Player } from "./Player";
 import constants from "../../utils/constants";
 import { Rocket } from "./Rocket";
+import { Bot } from "./Bot";
 
 const clientSideFilterEntities = (client: Client, key: string, value: Player, root: ArenaState) => {
   const currentPlayer = root.players.get(client.sessionId);
@@ -29,4 +30,7 @@ export class ArenaState extends Schema {
 
   @type({ map: Rocket })
   rockets: MapSchema<Rocket> = new MapSchema<Rocket>();
+
+  @type({ map: Bot })
+  bots: MapSchema<Bot> = new MapSchema<Bot>();
 }
