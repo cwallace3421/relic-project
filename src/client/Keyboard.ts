@@ -11,6 +11,7 @@ export enum UserActions {
   ZOOM_IN = "ZOOM_IN",
   ZOOM_OUT = "ZOOM_OUT",
   TOGGLE_MENU = "TOGGLE_MENU",
+  TOGGLE_TIMING_GRAPH = "TOGGLE_TIMING_GRAPH",
 }
 
 const UserActionsNetworked: UserActions[] = [
@@ -32,6 +33,7 @@ export class Keyboard {
     [UserActions.ZOOM_IN]: "+",
     [UserActions.ZOOM_OUT]: "-",
     [UserActions.TOGGLE_MENU]: "Escape",
+    [UserActions.TOGGLE_TIMING_GRAPH]: "/",
   };
 
   private state: { [key in UserActions | "DIRTY"]: boolean } = {
@@ -43,6 +45,7 @@ export class Keyboard {
     [UserActions.ZOOM_IN]: false,
     [UserActions.ZOOM_OUT]: false,
     [UserActions.TOGGLE_MENU]: false,
+    [UserActions.TOGGLE_TIMING_GRAPH]: false,
     DIRTY: false,
   };
 
@@ -72,7 +75,7 @@ export class Keyboard {
   public tick(room: Room, timingGraph: TimingGraph) {
     if (!this.state.DIRTY) return;
 
-    const keyStartTime = Date.now();
+    const _tickComplete = timingGraph.addTimingEventCallback(TimingEventType.SEND_USER_ACTION);
 
     const message: { [key in UserActions]?: boolean } = {};
     const stateUserActions = Object.entries(this.state) as [UserActions, boolean][];
@@ -88,6 +91,6 @@ export class Keyboard {
 
     this.state.DIRTY = false;
 
-    timingGraph.addTimingEvent(keyStartTime, TimingEventType.SEND_KEYBOARD);
+    _tickComplete();
   }
 }

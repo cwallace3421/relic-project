@@ -1,9 +1,10 @@
 import * as PIXI from "pixi.js";
+import constants from "../utils/constants";
 
 export enum TimingEventType {
   P_ON_CHANGE = "P_ON_CHANGE",
   P_UPDATE = "P_UPDATE",
-  SEND_KEYBOARD = "SEND_KEYBOARD",
+  SEND_USER_ACTION = "SEND_USER_ACTION",
   TICK = "TICK",
 }
 
@@ -13,14 +14,43 @@ interface TimingEvent {
   type: TimingEventType;
 }
 
+const GraphDisplayConfig = {
+  [TimingEventType.TICK]: {
+    color: 0xffffff,
+    name: 'TICK',
+    order: 1,
+  },
+  [TimingEventType.SEND_USER_ACTION]: {
+    color: 0x00ffee,
+    name: 'USER ACTION',
+    order: 2,
+  },
+  [TimingEventType.P_UPDATE]: {
+    color: 0xff1447,
+    name: 'PLAYER UPDATE',
+    order: 3,
+  },
+  [TimingEventType.P_ON_CHANGE]: {
+    color: 0xcaff9e,
+    name: 'PLAYER ON CHANGE',
+    order: 4,
+  },
+  default: {
+    color: 0xfbff00,
+    name: 'DEFAULT',
+    order: -1,
+  }
+}
+
 export class TimingGraph {
 
   private enabled: boolean = false;
   private events: TimingEvent[] = [];
-  private eventsMaxLength: number = 400;
+  private eventsMaxLength: number = 300;
 
   private stage: PIXI.Container;
   private graphGfx: PIXI.Graphics;
+  private graphGfxLegend: PIXI.Text[] = [];
   private graphScale: number = 1;
 
   // -----------------------------------------------------------------------------------------------
@@ -30,7 +60,20 @@ export class TimingGraph {
   }
 
   // -----------------------------------------------------------------------------------------------
-  public addTimingEvent(start: number, type: TimingEventType) {
+  public toggleEnabled() {
+    if (this.enabled) {
+      this.graphGfx.destroy();
+      this.graphGfx = undefined;
+      for (let i = 0; i < this.graphGfxLegend.length; i++) {
+        this.graphGfxLegend[i].destroy();
+      }
+      this.graphGfxLegend.length = 0;
+    }
+    this.enabled = !this.enabled;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  public addTimingEvent(startTimestamp: number, type: TimingEventType) {
     if (!this.enabled) return;
 
     if (this.events.length + 1 > this.eventsMaxLength) {
@@ -39,10 +82,45 @@ export class TimingGraph {
 
     const now = Date.now();
     this.events.push({
-      start: start || now,
+      start: startTimestamp || now,
       end: now,
       type,
     });
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  public addTimingEventInstant(type: TimingEventType) {
+    if (!this.enabled) return;
+
+    if (this.events.length + 1 > this.eventsMaxLength) {
+      this.events.length = 0;
+    }
+
+    const startTimestamp = Date.now();
+    this.events.push({
+      start: startTimestamp,
+      end: startTimestamp + 1,
+      type,
+    });
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  public addTimingEventCallback(type: TimingEventType): () => void {
+    if (!this.enabled) return () => {};
+
+    const startTimestamp = Date.now();
+
+    return () => {
+      if (this.events.length + 1 > this.eventsMaxLength) {
+        this.events.length = 0;
+      }
+
+      this.events.push({
+        start: startTimestamp,
+        end:  Date.now(),
+        type,
+      });
+    };
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -58,59 +136,67 @@ export class TimingGraph {
   // -----------------------------------------------------------------------------------------------
   public tick() {
     if (!this.enabled) return;
+    if (this.events.length === 0) return;
+
+    const LINE_HEIGHT = 20;
+    const TIMING_GRAPH_X = 110;
+    const TIMING_GRAPH_Y = constants.WORLD_SIZE + 20;
+    const TIMING_GRAPH_WIDTH = this.stage.width;
+    const TIMING_GRAPH_HEIGHT = 300;
+    const TIMING_GRAPH_X_OFFSET = 100;
+    const FPS_60_TIMING_PADDING = 2;
+    const FPS_60_WIDTH = 16.66;
 
     if (!this.graphGfx) {
       this.graphGfx = new PIXI.Graphics();
-      this.graphGfx.height = 300;
-      this.graphGfx.width = this.stage.width;
-      this.graphGfx.position.set(0, this.stage.height - this.graphGfx.height);
+      this.graphGfx.height = TIMING_GRAPH_HEIGHT;
+      this.graphGfx.width = TIMING_GRAPH_WIDTH;
+      this.graphGfx.position.set(TIMING_GRAPH_X, TIMING_GRAPH_Y);
       this.stage.addChild(this.graphGfx);
+
+      const textStyle = new PIXI.TextStyle({ fill: "white", align: "right", fontSize: 8 });
+
+      const keys = Object.keys(GraphDisplayConfig);
+      for (let i = 0; i < keys.length; i++) {
+        if (keys[i] === 'default') continue;
+
+        const config = GraphDisplayConfig[keys[i]];
+        const yOffset = (TIMING_GRAPH_Y + FPS_60_TIMING_PADDING) + ((config.order - 1) * LINE_HEIGHT);
+
+        const text = new PIXI.Text(config.name, textStyle);
+        text.anchor.set(1, 0.5);
+        text.position.set(TIMING_GRAPH_X_OFFSET, yOffset + (LINE_HEIGHT / 2));
+        this.graphGfxLegend.push(text);
+
+        this.stage.addChild(text);
+      }
+    } else {
+      this.graphGfx.clear();
     }
 
-    this.graphGfx.clear();
+    // TODO: Reimplement the graph scaling.
 
-    let beginTime = 0;
-    let timePassed = 0;
-    let lineHeight = 20;
-    let color = 0xffffff;
-    let scale = this.graphScale;
+    const beginTime = this.events[0].start;
     for (let i = 0; i < this.events.length; i++) {
-      const e = this.events[i];
-      if (i === 0) {
-        beginTime = e.start;
-      }
-      timePassed = e.start - beginTime;
-      switch (e.type) {
-        case TimingEventType.P_ON_CHANGE:
-          lineHeight = 3;
-          color = 0xcaff9e;
-          break;
-        case TimingEventType.P_UPDATE:
-          lineHeight = 2;
-          color = 0x91fffb;
-          break;
-        case TimingEventType.SEND_KEYBOARD:
-          lineHeight = 1;
-          color = 0xf3ff96;
-          break;
-        case TimingEventType.TICK:
-        default:
-          lineHeight = 0;
-          color = 0xffffff;
-      }
-      const len = Math.max(1, e.end - beginTime);
-      this.graphGfx.lineStyle(12, color, 1, 1)
-        .moveTo(timePassed * scale, 270 - (12 * lineHeight))
-        .lineTo(len * scale, 270 - (12 * lineHeight));
+      const event = this.events[i];
+      const config = GraphDisplayConfig[event.type];
+
+      const startPos = event.start - beginTime;
+      const endPos = Math.max(1, event.end - beginTime);
+
+      const yOffset = FPS_60_TIMING_PADDING + ((config.order - 1) * LINE_HEIGHT);
+      this.graphGfx.beginFill(config.color);
+      this.graphGfx.drawRect(startPos, yOffset, endPos - startPos, LINE_HEIGHT);
+      this.graphGfx.endFill();
     }
 
-    this.graphGfx.lineStyle(1, 0xc9c9c9, 1)
-        .moveTo(0, 270)
-        .lineTo(window.innerWidth, 270);
-    for (let i = 0; i < Math.floor(window.innerWidth / 10); i++) {
-      this.graphGfx.lineStyle(1, 0xc9c9c9, 0)
-        .moveTo((10 * i) * scale, 270)
-        .lineTo((10 * i) * scale, 290);
+    for (let i = 0; i < TIMING_GRAPH_WIDTH / FPS_60_WIDTH; i++) {
+      if ((i + 1) % 2 === 0) continue;
+
+      const xOffset = i * FPS_60_WIDTH;
+      this.graphGfx.lineStyle(1, 0x7732a8, 1)
+        .moveTo(xOffset, 0)
+        .lineTo(xOffset + FPS_60_WIDTH, 0);
     }
   }
 }

@@ -73,18 +73,20 @@ export class Application extends PIXI.Application {
 
     this.authenticate();
 
+    this.ticker.maxFPS = 60;
+    this.ticker.minFPS = 30;
     this.ticker.add(this.tick.bind(this));
 
     // console.log(this.ticker.minFPS);
     // console.log(this.ticker.maxFPS);
 
     this.pingPong = new PingPong(true, this.stage);
-    this.timingGraph = new TimingGraph(true, this.stage);
+    this.timingGraph = new TimingGraph(false, this.stage);
 
     this.keyboard = new Keyboard((action: UserActions) => {
-      console.log(action);
       if (action === UserActions.ZOOM_IN) this.timingGraph.changeGraphScale(1);
       if (action === UserActions.ZOOM_OUT) this.timingGraph.changeGraphScale(-1);
+      if (action === UserActions.TOGGLE_TIMING_GRAPH) this.timingGraph.toggleEnabled();
     });
 
     // this.interpolation = false;
@@ -202,18 +204,10 @@ export class Application extends PIXI.Application {
   }
 
   tick() {
-    const tickStartTime = Date.now();
+    const _tickComplete = this.timingGraph.addTimingEventCallback(TimingEventType.TICK);
 
     const deltaTime: number = this.ticker.deltaMS / 1000;
 
-    // if (this.keyboardState.isDirty) {
-    //   const ketStartTime = Date.now();
-    //   console.log('Send Keyboard State', this.keyboardState);
-    //   const { isDirty, ...state } = this.keyboardState;
-    //   this.room.send('keyboard', state);
-    //   this.keyboardState.isDirty = false;
-    //   this.timingGraph.addTimingEvent(ketStartTime, TimingEventType.SEND_KEYBOARD);
-    // }
     this.keyboard.tick(this.room, this.timingGraph);
 
     let targetX = 0;
@@ -288,10 +282,9 @@ export class Application extends PIXI.Application {
     }
 
     this.pingPong.tick();
-
     this.timingGraph.tick();
 
-    this.timingGraph.addTimingEvent(tickStartTime, TimingEventType.TICK);
+    _tickComplete();
   }
 
   onServerEntityChange(id: string, allChanges: DataChange<any>[]) {
@@ -319,7 +312,7 @@ export class Application extends PIXI.Application {
         });
 
       if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
-        this.timingGraph.addTimingEvent(undefined, TimingEventType.P_ON_CHANGE);
+        this.timingGraph.addTimingEventInstant(TimingEventType.P_ON_CHANGE);
       }
 
       if(this.serverEntityMap[id].positionBuffer.length > 3) {
