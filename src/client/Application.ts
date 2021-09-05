@@ -3,20 +3,15 @@ import * as Viewport from "pixi-viewport";
 import { Room, Client } from "colyseus.js";
 import { DataChange } from "@colyseus/schema";
 import { ArenaState } from "../server/rooms/ArenaState";
+import { distance, lerp, normalize } from "../utils/vector";
+import { PingPong } from "./PingPong";
+import { TimingGraph, TimingEventType } from "./TimingGraph";
 import constants from "../utils/constants";
-import { lerp } from "../utils/vector";
+import { Keyboard, UserActions } from "./Keyboard";
 
 const ENDPOINT = (process.env.NODE_ENV !== "production")
   ? "ws://localhost:8080"
   : "production";
-
-const keyboardKeyToStateMap = {
-  "w": "isUpPressed",
-  "s": "isDownPressed",
-  "a": "isLeftPressed",
-  "d": "isRightPressed"
-};
-const moveKeys = Object.keys(keyboardKeyToStateMap);
 
 enum ServerEntityType {
   PLAYER = "PLAYER",
@@ -40,14 +35,6 @@ interface ServerEntityMap {
   [id: string]: ServerEntity
 };
 
-interface KeyboardState {
-  isUpPressed: boolean;
-  isDownPressed: boolean;
-  isLeftPressed: boolean;
-  isRightPressed: boolean;
-  isDirty: boolean;
-};
-
 export class Application extends PIXI.Application {
   serverEntityMap: ServerEntityMap = {};
   clientEntity: ServerEntity;
@@ -57,15 +44,9 @@ export class Application extends PIXI.Application {
 
   viewport: Viewport;
 
-  keyboardState: KeyboardState;
-
-  pingArray: Array<{
-    messageSentToServer: number,
-    messageRecievedByServer: number,
-    messageSentToClient: number,
-    messageRecievedByClient: number
-  }>;
-  pingText: PIXI.Text;
+  keyboard: Keyboard;
+  pingPong: PingPong;
+  timingGraph: TimingGraph;
 
   constructor() {
     super({
@@ -94,48 +75,19 @@ export class Application extends PIXI.Application {
 
     this.ticker.add(this.tick.bind(this));
 
-    this.pingArray = [];
+    // console.log(this.ticker.minFPS);
+    // console.log(this.ticker.maxFPS);
 
-    this.pingText = new PIXI.Text(`${0} ms - out\n${0} ms - in`, new PIXI.TextStyle({
-      fill: "white",
-      align: "right",
-      fontSize: 16
-    }));
-    this.pingText.anchor.set(1, 0);
-    this.pingText.position.set(this.stage.width, 0);
-    this.stage.addChild(this.pingText);
+    this.pingPong = new PingPong(true, this.stage);
+    this.timingGraph = new TimingGraph(true, this.stage);
+
+    this.keyboard = new Keyboard((action: UserActions) => {
+      console.log(action);
+      if (action === UserActions.ZOOM_IN) this.timingGraph.changeGraphScale(1);
+      if (action === UserActions.ZOOM_OUT) this.timingGraph.changeGraphScale(-1);
+    });
 
     // this.interpolation = false;
-
-    this.keyboardState = {
-      isUpPressed: false,
-      isDownPressed: false,
-      isLeftPressed: false,
-      isRightPressed: false,
-      isDirty: false
-    };
-
-    window.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (moveKeys.includes(e.key)) {
-        const stateKey = keyboardKeyToStateMap[e.key];
-        if (this.keyboardState[stateKey] === false) {
-          this.keyboardState.isDirty = true;
-          this.keyboardState[stateKey] = true;
-        }
-        // If it's not false that means it's true already so we don't need to set the dirty flag.
-      }
-    });
-
-    window.addEventListener("keyup", (e: KeyboardEvent) => {
-      if (moveKeys.includes(e.key)) {
-        const stateKey = keyboardKeyToStateMap[e.key];
-        if (this.keyboardState[stateKey] === true) {
-          this.keyboardState.isDirty = true;
-          this.keyboardState[stateKey] = false;
-        }
-        // If it's not true that means it's false already so we don't need to set the dirty flag.
-      }
-    });
   }
 
   async authenticate() {
@@ -246,80 +198,100 @@ export class Application extends PIXI.Application {
       }
     }
 
-    // Ping Pong
-    {
-      setInterval(() => {
-        this.room.send('ping', {
-          messageSentToServer: Date.now(),
-          messageRecievedByServer: null,
-          messageSentToClient: null,
-          messageRecievedByClient: null
-        });
-      }, 100);
-
-      this.room.onMessage('pong', (message) => {
-        message.messageRecievedByClient = Date.now();
-
-        this.pingArray.push(message);
-        if (this.pingArray.length > 10) {
-          // remove first element of array, so we only have at max 10 elements in the array.
-          this.pingArray.shift();
-        }
-      });
-    }
+    this.pingPong.start(this.room);
   }
 
-  tick(delta: number) {
-    if (this.keyboardState.isDirty) {
-      console.log('Send Keyboard State', this.keyboardState);
-      const { isDirty, ...state } = this.keyboardState;
-      this.room.send('keyboard', state);
-      this.keyboardState.isDirty = false;
-    }
+  tick() {
+    const tickStartTime = Date.now();
 
-    let oldX = 0, oldY = 0;
-    let targetX = 0, targetY = 0;
-    let newPos = { x: 0, y: 0 };
+    const deltaTime: number = this.ticker.deltaMS / 1000;
+
+    // if (this.keyboardState.isDirty) {
+    //   const ketStartTime = Date.now();
+    //   console.log('Send Keyboard State', this.keyboardState);
+    //   const { isDirty, ...state } = this.keyboardState;
+    //   this.room.send('keyboard', state);
+    //   this.keyboardState.isDirty = false;
+    //   this.timingGraph.addTimingEvent(ketStartTime, TimingEventType.SEND_KEYBOARD);
+    // }
+    this.keyboard.tick(this.room, this.timingGraph);
+
+    let targetX = 0;
+    let targetY = 0;
+    let targetSpeed = 0;
+    let targetDir = { x: 0, y: 0 };
     let entity: ServerEntity = null;
 
     // Interpolate the server entities
     for (let id in this.serverEntityMap) {
       entity = this.serverEntityMap[id];
 
-      oldX = entity.gfx.x;
-      oldY = entity.gfx.y;
-
-      if (entity.type === ServerEntityType.PLAYER) {
-        const playerState = this.room.state.players.get(id);
-        targetX = playerState.x;
-        targetY = playerState.y;
-      }
-      else if (entity.type === ServerEntityType.BOT) {
-        const botState = this.room.state.bots.get(id);
-        targetX = botState.x;
-        targetY = botState.y;
-      }
-      else if (entity.type === ServerEntityType.ROCKET) {
-        const rocketState = this.room.state.rockets.get(id);
-        targetX = rocketState.x;
-        targetY = rocketState.y;
+      // If there is no updates in the buffer then the entity doesn't need updated. Early out.
+      if (entity.positionBuffer.length === 0) {
+        continue;
       }
 
-      newPos = lerp(oldX, oldY, targetX, targetY, 0.2, 0.1);
-      entity.gfx.x = newPos.x;
-      entity.gfx.y = newPos.y;
+      let pStartTime;
+      if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
+        pStartTime = Date.now();
+      }
+
+      // The update packets might not be updating the x, y or speed. So we need to default the values. Use the current x, y or speed.
+      targetX = entity.positionBuffer[0].x || entity.gfx.x;
+      targetY = entity.positionBuffer[0].y || entity.gfx.y;
+      targetSpeed = entity.positionBuffer[0].speed || entity.speed;
+
+      // Set the new speed from the update packet.
+      if (entity.speed !== targetSpeed) {
+        this.serverEntityMap[id].speed = targetSpeed;
+      }
+
+      const speed = targetSpeed * deltaTime;
+      const distanceToTarget = Math.abs(distance(entity.gfx.x, entity.gfx.y, targetX, targetY));
+
+      // if (entity.type === ServerEntityType.PLAYER) {
+      //   console.log('pixels per second: ', (speed * this.ticker.FPS));
+      // }
+
+      // If the distance we are about to move is greater than the actual distance to the target, then we want to snap to the target position.
+      // Else, move towards the target as normal.
+      if (speed >= distanceToTarget) {
+        entity.gfx.x = targetX;
+        entity.gfx.y = targetY;
+
+        this.serverEntityMap[id].positionBuffer.shift();
+        // if (entity.type === ServerEntityType.PLAYER) {
+        //   console.log('shift, left: ',  this.serverEntityMap[id].positionBuffer.length);
+        // }
+      } else {
+        // if (entity.type === ServerEntityType.PLAYER) {
+        //   console.log('move player towards');
+        // }
+        targetDir = normalize(targetX - entity.gfx.x, targetY - entity.gfx.y);
+        entity.gfx.x += speed * targetDir.x;
+        entity.gfx.y += speed * targetDir.y;
+      }
+
+      if (entity.positionBuffer.length > 5) {
+        const len = entity.positionBuffer.length;
+        entity.gfx.x = entity.positionBuffer[len - 2].x || entity.gfx.x;
+        entity.gfx.y = entity.positionBuffer[len - 2].y || entity.gfx.y;
+        entity.speed = entity.positionBuffer[len - 2].speed || entity.speed;
+
+        this.serverEntityMap[id].positionBuffer = [entity.positionBuffer[len - 1]];
+        console.warn('Entity had more than 5 elements in the position buffer, dumping them.', { id, elementsDumped: (len - 1) });
+      }
+
+      if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
+        this.timingGraph.addTimingEvent(pStartTime, TimingEventType.P_UPDATE);
+      }
     }
 
-    // Calculate average ping for outgoing and incoming packets
-    {
-      if (this.pingArray.length === 10) {
-        const outgoing: Array<number> = this.pingArray.map((ping) => ping.messageRecievedByServer - ping.messageSentToServer);
-        const incoming: Array<number> = this.pingArray.map((ping) => ping.messageRecievedByClient - ping.messageSentToClient);
-        const outgoingAverage = outgoing.reduce((p, c) => p + c) / 10;
-        const incomingAverage = incoming.reduce((p, c) => p + c) / 10;
-        this.pingText.text = `${outgoingAverage} ms - out\n${incomingAverage} ms - in`;
-      }
-    }
+    this.pingPong.tick();
+
+    this.timingGraph.tick();
+
+    this.timingGraph.addTimingEvent(tickStartTime, TimingEventType.TICK);
   }
 
   onServerEntityChange(id: string, allChanges: DataChange<any>[]) {
@@ -337,15 +309,23 @@ export class Application extends PIXI.Application {
       }
     });
 
-    // if (x || y) {
-    //   this.serverEntityMap[id]
-    //     .positionBuffer.push({
-    //       timestamp: Date.now(),
-    //       speed,
-    //       x,
-    //       y
-    //     });
-    // }
+    if (x || y) {
+      this.serverEntityMap[id]
+        .positionBuffer.push({
+          timestamp: Date.now(),
+          speed,
+          x,
+          y
+        });
+
+      if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
+        this.timingGraph.addTimingEvent(undefined, TimingEventType.P_ON_CHANGE);
+      }
+
+      if(this.serverEntityMap[id].positionBuffer.length > 3) {
+        console.warn('Adding new position buffer to entity, though it has more than 3 elements.', { id, bufferLength: this.serverEntityMap[id].positionBuffer.length });
+      }
+    }
   }
 
   createCircleInViewport(color: number, x: number, y: number, radius: number): PIXI.Graphics {
@@ -380,5 +360,3 @@ export class Application extends PIXI.Application {
   //     }
   // }
 }
-
-const lerp_old = (a: number, b: number, t: number) => (b - a) * t + a;

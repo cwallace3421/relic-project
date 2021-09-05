@@ -22,7 +22,8 @@ const onInit = (state: ArenaState) => {
 }
 
 const onTick = (state: ArenaState, delta: number): void => {
-  const deltaTime: number = delta / 1000;
+  // const deltaTime: number = delta / 1000;
+  const deltaTime: number = constants.SIMULATION_TICK_RATE / 1000;
 
   state.players.forEach((player, sessionId) => {
     onPlayerUpdate(sessionId, player, deltaTime);
@@ -65,7 +66,8 @@ const onPlayerJoin = (state: ArenaState, client: Client, options: any) => {
   state.players.set(client.sessionId, new Player().assign({
     x: Math.random() * state.width,
     y: Math.random() * state.height,
-    name: options.name
+    name: options.name,
+    speed: constants.PLAYER_SPEED,
   }));
 };
 
@@ -78,23 +80,29 @@ const onPlayerLeave = (state: ArenaState, client: Client) => {
 };
 
 const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void => {
-  const speed = constants.PLAYER_SPEED * delta;
+  const speed = player.speed * delta;
 
   let dir = { x: 0, y: 0 };
 
   if (player.isUpPressed === true) {
-    dir.y = -2;
+    dir.y = -1;
   }
   else if (player.isDownPressed === true) {
-    dir.y = 2;
+    dir.y = 1;
   }
 
   if (player.isLeftPressed === true) {
-    dir.x = -2;
+    dir.x = -1;
   }
   else if (player.isRightPressed === true) {
-    dir.x = 2;
+    dir.x = 1;
   }
+
+  if (dir.x === 0 && dir.y === 0) {
+    return;
+  }
+
+  // console.log('pixels per second: ', (speed * 60));
 
   dir = normalize(dir.x, dir.y);
 
@@ -122,6 +130,7 @@ const onRocketSpawn = (state: ArenaState): void => {
       y: constants.WORLD_SIZE / 2,
       active: true,
       targetId,
+      speed: constants.ROCKET_SPEED,
     }));
   } else {
     logger.error('Unable to spawn rocket as there is no players.', LogCodes.SERVER_ROCKET)
@@ -129,8 +138,8 @@ const onRocketSpawn = (state: ArenaState): void => {
 };
 
 const onRocketUpdate = (state: ArenaState, rocketId: string, delta: number): void => {
-  const speed = constants.ROCKET_START_SPEED * delta;
   const rocket = state.rockets.get(rocketId);
+  const speed = rocket.speed * delta;
 
   const targetId = rocket.targetId;
   if (!targetId) {
@@ -177,7 +186,8 @@ const onBotSpawn = (state: ArenaState) => {
     targetX: Math.random() * state.width,
     targetY: Math.random() * state.height,
     difficulty: difficulty,
-    name: botName
+    name: botName,
+    speed: constants.PLAYER_SPEED,
   }));
 };
 
@@ -191,7 +201,7 @@ const onBotUpdate = (state: ArenaState, botId: string, delta: number) => {
     });
   }
 
-  const speed = constants.PLAYER_SPEED * delta;
+  const speed = thisBot.speed * delta;
   const dirX = thisBot.targetX - thisBot.x;
   const dirY = thisBot.targetY - thisBot.y;
 

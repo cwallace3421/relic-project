@@ -1,5 +1,5 @@
 export default {
-  WORLD_SIZE: 800,
+  WORLD_SIZE: 1000,
   PLAYER_SPEED: 120,
   PLAYER_RADIUS: 10,
   ROOM_NAME: "arena",
@@ -10,5 +10,5 @@ export default {
   ROCKET_START_SPEED: 60,
   ROCKET_SPEED_INCREASE: 0.2,
   BOT_ENABLED: true,
-  BOT_COUNT: 3,
+  BOT_COUNT: 2,
 };

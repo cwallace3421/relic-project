@@ -6,12 +6,22 @@ import { onInit, onPlayerAuth, onPlayerJoin, onPlayerLeave, onRocketSpawn, onTic
 import logger, { LogCodes } from "../../utils/logger";
 import constants from "../../utils/constants";
 
-interface KeyboardMessage {
-  isUpPressed: boolean;
-  isDownPressed: boolean;
-  isLeftPressed: boolean;
-  isRightPressed: boolean;
+// interface KeyboardMessage {
+//   isUpPressed: boolean;
+//   isDownPressed: boolean;
+//   isLeftPressed: boolean;
+//   isRightPressed: boolean;
+// }
+
+enum UserActions {
+  PLAYER_UP = "PLAYER_UP",
+  PLAYER_DOWN = "PLAYER_DOWN",
+  PLAYER_LEFT = "PLAYER_LEFT",
+  PLAYER_RIGHT = "PLAYER_RIGHT",
+  DASH = "DASH",
 }
+
+type UserActionMessage = { [key in UserActions]: boolean };
 
 export class ArenaRoom extends Room<ArenaState> {
 
@@ -23,8 +33,8 @@ export class ArenaRoom extends Room<ArenaState> {
 
     onInit(this.state);
 
-    this.onMessage("keyboard", (client: Client, message: KeyboardMessage) => {
-      this.onKeyboardMessage(client, message);
+    this.onMessage("user_action", (client: Client, message: UserActionMessage) => {
+      this.onUserActionMessage(client, message);
     });
 
     this.onMessage("ping", (client: Client, message: any) => {
@@ -43,7 +53,9 @@ export class ArenaRoom extends Room<ArenaState> {
 
     // Set simulation interval, runs the tick loop for the server world.
     // 60 fps - 16.6 ms
-    this.setSimulationInterval(this.onRoomUpdate.bind(this), constants.SIMULATION_TICK_RATE);
+    this.setSimulationInterval((delta: number) => {
+      this.onRoomUpdate(delta);
+    }, constants.SIMULATION_TICK_RATE);
   }
 
   onAuth(client: Client, options: any, request: http.IncomingMessage) {
@@ -62,16 +74,16 @@ export class ArenaRoom extends Room<ArenaState> {
     onTick(this.state, delta);
   }
 
-  onKeyboardMessage(client: Client, message: KeyboardMessage) {
+  onUserActionMessage(client: Client, message: UserActionMessage) {
     const player = this.state.players[client.sessionId] as Player;
     if (!player || player.dead === true) {
       logger.error("Player is trying to send an update when it's dead.", LogCodes.SERVER_PLAYER, { sessionId: client.sessionId });
     } else {
       player.assign({
-        isUpPressed: message.isUpPressed,
-        isDownPressed: message.isDownPressed,
-        isLeftPressed: message.isLeftPressed,
-        isRightPressed: message.isRightPressed,
+        isUpPressed: message[UserActions.PLAYER_UP],
+        isDownPressed: message[UserActions.PLAYER_DOWN],
+        isLeftPressed: message[UserActions.PLAYER_LEFT],
+        isRightPressed: message[UserActions.PLAYER_RIGHT],
       });
     }
   }
