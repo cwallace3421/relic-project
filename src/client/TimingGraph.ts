@@ -80,7 +80,7 @@ export class TimingGraph {
       this.events.length = 0;
     }
 
-    const now = Date.now();
+    const now = performance.now();
     this.events.push({
       start: startTimestamp || now,
       end: now,
@@ -96,7 +96,7 @@ export class TimingGraph {
       this.events.length = 0;
     }
 
-    const startTimestamp = Date.now();
+    const startTimestamp = performance.now();
     this.events.push({
       start: startTimestamp,
       end: startTimestamp + 1,
@@ -108,7 +108,7 @@ export class TimingGraph {
   public addTimingEventCallback(type: TimingEventType): () => void {
     if (!this.enabled) return () => {};
 
-    const startTimestamp = Date.now();
+    const startTimestamp = performance.now();
 
     return () => {
       if (this.events.length + 1 > this.eventsMaxLength) {
@@ -117,7 +117,7 @@ export class TimingGraph {
 
       this.events.push({
         start: startTimestamp,
-        end:  Date.now(),
+        end: performance.now(),
         type,
       });
     };

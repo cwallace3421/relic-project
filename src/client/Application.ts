@@ -8,6 +8,7 @@ import { PingPong } from "./PingPong";
 import { TimingGraph, TimingEventType } from "./TimingGraph";
 import constants from "../utils/constants";
 import { Keyboard, UserActions } from "./Keyboard";
+import EntityHelper from "./EntityHelper";
 
 const ENDPOINT = (process.env.NODE_ENV !== "production")
   ? "ws://localhost:8080"
@@ -23,12 +24,15 @@ interface ServerEntity {
   type: ServerEntityType;
   speed: number;
   positionBuffer: {
+    id: number;
     timestamp: number;
+    timeElapsed?: number;
     speed?: number;
     x?: number;
     y?: number;
   }[];
   gfx: PIXI.Graphics;
+  flag?: boolean;
 };
 
 interface ServerEntityMap {
@@ -48,6 +52,9 @@ export class Application extends PIXI.Application {
   pingPong: PingPong;
   timingGraph: TimingGraph;
 
+  boundaries: PIXI.Graphics;
+
+  // -----------------------------------------------------------------------------------------------
   constructor() {
     super({
       width: window.innerWidth,
@@ -63,10 +70,12 @@ export class Application extends PIXI.Application {
     });
 
     // draw boundaries of the world
-    const boundaries = new PIXI.Graphics();
-    boundaries.beginFill(0x000000);
-    boundaries.drawRoundedRect(0, 0, constants.WORLD_SIZE, constants.WORLD_SIZE, 30);
-    this.viewport.addChild(boundaries);
+    this.boundaries = new PIXI.Graphics();
+    this.boundaries.beginFill(0x000000);
+    this.boundaries.drawRoundedRect(0, 0, constants.WORLD_SIZE, constants.WORLD_SIZE, 30);
+    this.viewport.addChild(this.boundaries);
+
+    this.boundaries.lineStyle(1, 0xffb3f6);
 
     // add viewport to stage
     this.stage.addChild(this.viewport);
@@ -92,6 +101,7 @@ export class Application extends PIXI.Application {
     // this.interpolation = false;
   }
 
+  // -----------------------------------------------------------------------------------------------
   async authenticate() {
     // anonymous auth for social
     // await this.client.auth.login();
@@ -203,6 +213,7 @@ export class Application extends PIXI.Application {
     this.pingPong.start(this.room);
   }
 
+  // -----------------------------------------------------------------------------------------------
   tick() {
     const _tickComplete = this.timingGraph.addTimingEventCallback(TimingEventType.TICK);
 
@@ -210,6 +221,78 @@ export class Application extends PIXI.Application {
 
     this.keyboard.tick(this.room, this.timingGraph);
 
+    // this.tickEntityMovement(deltaTime);
+
+    for (const entityId in this.serverEntityMap) {
+      const entity = this.serverEntityMap[entityId];
+
+      // If there is no updates in the buffer then the entity doesn't need updated. Early out.
+      if (!EntityHelper.hasEnoughPositionBuffers(entity)) continue;
+
+      const pos = EntityHelper.lerpBetweenPositionBuffers(entity, this.ticker.deltaMS, 0, 1);
+
+      if (pos) {
+        entity.gfx.x = pos.x;
+        entity.gfx.y = pos.y;
+      }
+
+      // const packet1 = entity.positionBuffer[0];
+      // const packet2 = entity.positionBuffer[1];
+      // const timeDiffMilli = packet2.timestamp - packet1.timestamp;
+      // if (entity.type === ServerEntityType.PLAYER) console.log(timeDiffMilli);
+      // const timeDiffSeconds = (timeDiffMilli / 1000) * .7; // Converts the time diff into seconds
+
+      // if (timeDiffMilli > 100) {
+      //   const [_, ...trimmedPositionBuffer] = entity.positionBuffer;
+      //   entity.positionBuffer = trimmedPositionBuffer;
+      //   continue;
+      // }
+
+      // if (packet1.timeElapsed === undefined) {
+      //   packet1.timeElapsed = 0;
+      // }
+
+      // // const rate = packet1.timeElapsed / timeDiffSeconds;
+      // const rate = packet1.timeElapsed / timeDiffMilli;
+      // const pos = lerp(
+      //     packet1.x || entity.gfx.x,
+      //     packet1.y || entity.gfx.y,
+      //     packet2.x || entity.gfx.x,
+      //     packet2.y || entity.gfx.y,
+      //   rate);
+
+      // // packet1.timeElapsed += deltaTime;
+      // packet1.timeElapsed += this.ticker.deltaMS;
+
+      // let next = false;
+      // if (packet1.timeElapsed + this.ticker.deltaMS >= timeDiffMilli) {
+      //   entity.gfx.x = packet2.x || entity.gfx.x;
+      //   entity.gfx.y = packet2.y || entity.gfx.y;
+      //   next = true;
+      // } else {
+      //   entity.gfx.x = pos.x;
+      //   entity.gfx.y = pos.y;
+      // }
+      // // TODO: We should be rendering like 100ms in the past. But I don't think we are doing that?
+      // // entity.gfx.x = pos.x;
+      // // entity.gfx.y = pos.y;
+
+      // if (rate >= 1.0 || next) {
+      //   if (entity.type === ServerEntityType.PLAYER) console.log({elapsed: packet1.timeElapsed, timeDiff: timeDiffMilli, rate});
+      //   const [_, ...trimmedPositionBuffer] = entity.positionBuffer;
+      //   entity.positionBuffer = trimmedPositionBuffer;
+      //   if (entity.type === ServerEntityType.PLAYER) console.log(entity.positionBuffer.length);
+      // }
+    }
+
+    this.pingPong.tick();
+    this.timingGraph.tick();
+
+    _tickComplete();
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  tickEntityMovement(deltaTime: number) {
     let targetX = 0;
     let targetY = 0;
     let targetSpeed = 0;
@@ -280,14 +363,33 @@ export class Application extends PIXI.Application {
         this.timingGraph.addTimingEvent(pStartTime, TimingEventType.P_UPDATE);
       }
     }
-
-    this.pingPong.tick();
-    this.timingGraph.tick();
-
-    _tickComplete();
   }
 
+  private prev: number;
+
+  // -----------------------------------------------------------------------------------------------
   onServerEntityChange(id: string, allChanges: DataChange<any>[]) {
+    if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
+      const now = performance.now();
+      if (this.prev) console.log('TIME SINCE', now - this.prev);
+      this.prev = now;
+    }
+    /*
+    [
+        {
+            "op": 128,
+            "field": "x",
+            "value": 813.3449929623681,
+            "previousValue": 816.782534408259
+        },
+        {
+            "op": 128,
+            "field": "y",
+            "value": 499.735169805539,
+            "previousValue": 497.692986814771
+        }
+    ]
+    */
     let x: number;
     let y: number;
     let speed: number;
@@ -300,27 +402,38 @@ export class Application extends PIXI.Application {
       } else if (c.field === 'speed' && c.value) {
         speed = c.value;
       }
+
     });
 
+    // Only push an entity change to the buffer if the x or y is changing
+    // TODO: Obv this won't work if the speed is changing.
     if (x || y) {
-      this.serverEntityMap[id]
-        .positionBuffer.push({
-          timestamp: Date.now(),
-          speed,
-          x,
-          y
-        });
+      const positionBuffer = this.serverEntityMap[id].positionBuffer;
+      const bufferToAdd = { timestamp: performance.now(), speed, x, y, id: Math.floor(Math.random() * 100000) };
+
+      if (positionBuffer.length > 0) {
+        const lastAddedBuffer = positionBuffer[positionBuffer.length - 1];
+        if (bufferToAdd.timestamp - lastAddedBuffer.timestamp > 80) {
+          if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) console.log('TIME DIFF TO PREVIOUSLY ADDED BUFFER', bufferToAdd.timestamp - lastAddedBuffer.timestamp);
+          positionBuffer.length = 0;
+        }
+      }
+
+      positionBuffer.push(bufferToAdd);
 
       if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
         this.timingGraph.addTimingEventInstant(TimingEventType.P_ON_CHANGE);
       }
 
-      if(this.serverEntityMap[id].positionBuffer.length > 3) {
-        console.warn('Adding new position buffer to entity, though it has more than 3 elements.', { id, bufferLength: this.serverEntityMap[id].positionBuffer.length });
-      }
+      // if (this.serverEntityMap[id].positionBuffer.length > 3) {
+      // console.warn('Adding new position buffer to entity, though it has more than 3 elements.', { id, bufferLength: this.serverEntityMap[id].positionBuffer.length });
+      // const buffer = this.serverEntityMap[id].positionBuffer;
+      // this.serverEntityMap[id].positionBuffer = [buffer[buffer.length - 3], buffer[buffer.length - 2], buffer[buffer.length - 1]];
+      // }
     }
   }
 
+  // -----------------------------------------------------------------------------------------------
   createCircleInViewport(color: number, x: number, y: number, radius: number): PIXI.Graphics {
     const gfx = new PIXI.Graphics();
     gfx.lineStyle(0);

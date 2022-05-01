@@ -13,6 +13,8 @@ export const distance = (x1: number, y1: number, x2: number, y2: number): number
   return Math.sqrt((dirX * dirX) + (dirY * dirY));
 }
 
+const l = (a: number, b: number, t: number) => (b - a) * t + a;
+
 export const lerp = (x1: number, y1: number, x2: number, y2: number, t: number, clamp?: number): { x: number, y: number } => {
   const xDiff = Math.abs(x2 - x1);
   const yDiff = Math.abs(y2 - y1);
@@ -21,8 +23,6 @@ export const lerp = (x1: number, y1: number, x2: number, y2: number, t: number, 
     // This threshold was randomly chosen, just to make sure that the difference isn't growing. And the the lerp is keeping up mostly.
     console.error('Lerping is not catching up', { xDiff, yDiff });
   }
-
-  const l = (a: number, b: number, t: number) => (b - a) * t + a;
 
   if (clamp) {
     return {

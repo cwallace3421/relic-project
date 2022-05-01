@@ -48,8 +48,8 @@ export class ArenaRoom extends Room<ArenaState> {
     }, 2000);
 
     // Set network patch rate, sends out state updates of the world to the clients.
-    // 20 fps - 50 ms
-    // this.setPatchRate(constants.NETWORK_BROADCAST_RATE);
+    // 20 packets per second - 50 ms
+    this.setPatchRate(constants.NETWORK_BROADCAST_RATE);
 
     // Set simulation interval, runs the tick loop for the server world.
     // 60 fps - 16.6 ms
