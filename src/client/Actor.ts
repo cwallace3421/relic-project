@@ -35,11 +35,6 @@ export class Actor extends _NetworkedEntity {
     this.id = id;
     this.name = name;
     this.isClient = isClient;
-
-    // if (this.isClient) {
-    //   this.viewport.follow(this.graphics);
-    // }
-
     return this;
   }
 

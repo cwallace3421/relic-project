@@ -129,8 +129,8 @@ export class Application extends PIXI.Application {
     this.room.state.players.onAdd = (playerServerEntity, sessionId: string) => {
       const isClient = sessionId === this.room.sessionId;
       const actor = new Actor(this.viewport)
-        .initGraphics(playerServerEntity.x, playerServerEntity.y, playerServerEntity.radius, 0xFFFF0B)
         .initMeta(ActorType.PLAYER, isClient, sessionId, playerServerEntity.name)
+        .initGraphics(playerServerEntity.x, playerServerEntity.y, playerServerEntity.radius, 0xFFFF0B)
         .initProperties(playerServerEntity.speed);
 
       this.worldEntityMap[sessionId] = {
@@ -157,8 +157,8 @@ export class Application extends PIXI.Application {
     // BOTS ------
     this.room.state.bots.onAdd = (botServerEntity, botId) => {
       const actor = new Actor(this.viewport)
-        .initGraphics(botServerEntity.x, botServerEntity.y, botServerEntity.radius, 0xFF550B)
         .initMeta(ActorType.BOT, false, botId, botServerEntity.name)
+        .initGraphics(botServerEntity.x, botServerEntity.y, botServerEntity.radius, 0xFF550B)
         .initProperties(botServerEntity.speed);
 
       this.worldEntityMap[botId] = {
