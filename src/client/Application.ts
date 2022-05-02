@@ -82,12 +82,12 @@ export class Application extends PIXI.Application {
 
     this.authenticate();
 
-    this.ticker.maxFPS = 60;
-    this.ticker.minFPS = 30;
-    this.ticker.add(this.tick.bind(this));
+    // this.ticker.maxFPS = 120;
+    // this.ticker.minFPS = 30;
+    // requestAnimationFrame(() => {})
+    // this.ticker.add(this.tick.bind(this));
 
-    // console.log(this.ticker.minFPS);
-    // console.log(this.ticker.maxFPS);
+    requestAnimationFrame(this.loop.bind(this));
 
     this.pingPong = new PingPong(true, this.stage);
     this.timingGraph = new TimingGraph(false, this.stage);
@@ -214,75 +214,20 @@ export class Application extends PIXI.Application {
   }
 
   // -----------------------------------------------------------------------------------------------
-  tick() {
+  tick(deltaTime: number) {
     const _tickComplete = this.timingGraph.addTimingEventCallback(TimingEventType.TICK);
 
-    const deltaTime: number = this.ticker.deltaMS / 1000;
-
     this.keyboard.tick(this.room, this.timingGraph);
-
-    // this.tickEntityMovement(deltaTime);
 
     for (const entityId in this.serverEntityMap) {
       const entity = this.serverEntityMap[entityId];
 
-      // If there is no updates in the buffer then the entity doesn't need updated. Early out.
-      if (!EntityHelper.hasEnoughPositionBuffers(entity)) continue;
-
-      const pos = EntityHelper.lerpBetweenPositionBuffers(entity, this.ticker.deltaMS, 0, 1);
+      const pos = EntityHelper.lerpBetweenPositionBuffers(entity, deltaTime, 0, 1);
 
       if (pos) {
         entity.gfx.x = pos.x;
         entity.gfx.y = pos.y;
       }
-
-      // const packet1 = entity.positionBuffer[0];
-      // const packet2 = entity.positionBuffer[1];
-      // const timeDiffMilli = packet2.timestamp - packet1.timestamp;
-      // if (entity.type === ServerEntityType.PLAYER) console.log(timeDiffMilli);
-      // const timeDiffSeconds = (timeDiffMilli / 1000) * .7; // Converts the time diff into seconds
-
-      // if (timeDiffMilli > 100) {
-      //   const [_, ...trimmedPositionBuffer] = entity.positionBuffer;
-      //   entity.positionBuffer = trimmedPositionBuffer;
-      //   continue;
-      // }
-
-      // if (packet1.timeElapsed === undefined) {
-      //   packet1.timeElapsed = 0;
-      // }
-
-      // // const rate = packet1.timeElapsed / timeDiffSeconds;
-      // const rate = packet1.timeElapsed / timeDiffMilli;
-      // const pos = lerp(
-      //     packet1.x || entity.gfx.x,
-      //     packet1.y || entity.gfx.y,
-      //     packet2.x || entity.gfx.x,
-      //     packet2.y || entity.gfx.y,
-      //   rate);
-
-      // // packet1.timeElapsed += deltaTime;
-      // packet1.timeElapsed += this.ticker.deltaMS;
-
-      // let next = false;
-      // if (packet1.timeElapsed + this.ticker.deltaMS >= timeDiffMilli) {
-      //   entity.gfx.x = packet2.x || entity.gfx.x;
-      //   entity.gfx.y = packet2.y || entity.gfx.y;
-      //   next = true;
-      // } else {
-      //   entity.gfx.x = pos.x;
-      //   entity.gfx.y = pos.y;
-      // }
-      // // TODO: We should be rendering like 100ms in the past. But I don't think we are doing that?
-      // // entity.gfx.x = pos.x;
-      // // entity.gfx.y = pos.y;
-
-      // if (rate >= 1.0 || next) {
-      //   if (entity.type === ServerEntityType.PLAYER) console.log({elapsed: packet1.timeElapsed, timeDiff: timeDiffMilli, rate});
-      //   const [_, ...trimmedPositionBuffer] = entity.positionBuffer;
-      //   entity.positionBuffer = trimmedPositionBuffer;
-      //   if (entity.type === ServerEntityType.PLAYER) console.log(entity.positionBuffer.length);
-      // }
     }
 
     this.pingPong.tick();
@@ -292,88 +237,7 @@ export class Application extends PIXI.Application {
   }
 
   // -----------------------------------------------------------------------------------------------
-  tickEntityMovement(deltaTime: number) {
-    let targetX = 0;
-    let targetY = 0;
-    let targetSpeed = 0;
-    let targetDir = { x: 0, y: 0 };
-    let entity: ServerEntity = null;
-
-    // Interpolate the server entities
-    for (let id in this.serverEntityMap) {
-      entity = this.serverEntityMap[id];
-
-      // If there is no updates in the buffer then the entity doesn't need updated. Early out.
-      if (entity.positionBuffer.length === 0) {
-        continue;
-      }
-
-      let pStartTime;
-      if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
-        pStartTime = Date.now();
-      }
-
-      // The update packets might not be updating the x, y or speed. So we need to default the values. Use the current x, y or speed.
-      targetX = entity.positionBuffer[0].x || entity.gfx.x;
-      targetY = entity.positionBuffer[0].y || entity.gfx.y;
-      targetSpeed = entity.positionBuffer[0].speed || entity.speed;
-
-      // Set the new speed from the update packet.
-      if (entity.speed !== targetSpeed) {
-        this.serverEntityMap[id].speed = targetSpeed;
-      }
-
-      const speed = targetSpeed * deltaTime;
-      const distanceToTarget = Math.abs(distance(entity.gfx.x, entity.gfx.y, targetX, targetY));
-
-      // if (entity.type === ServerEntityType.PLAYER) {
-      //   console.log('pixels per second: ', (speed * this.ticker.FPS));
-      // }
-
-      // If the distance we are about to move is greater than the actual distance to the target, then we want to snap to the target position.
-      // Else, move towards the target as normal.
-      if (speed >= distanceToTarget) {
-        entity.gfx.x = targetX;
-        entity.gfx.y = targetY;
-
-        this.serverEntityMap[id].positionBuffer.shift();
-        // if (entity.type === ServerEntityType.PLAYER) {
-        //   console.log('shift, left: ',  this.serverEntityMap[id].positionBuffer.length);
-        // }
-      } else {
-        // if (entity.type === ServerEntityType.PLAYER) {
-        //   console.log('move player towards');
-        // }
-        targetDir = normalize(targetX - entity.gfx.x, targetY - entity.gfx.y);
-        entity.gfx.x += speed * targetDir.x;
-        entity.gfx.y += speed * targetDir.y;
-      }
-
-      if (entity.positionBuffer.length > 5) {
-        const len = entity.positionBuffer.length;
-        entity.gfx.x = entity.positionBuffer[len - 2].x || entity.gfx.x;
-        entity.gfx.y = entity.positionBuffer[len - 2].y || entity.gfx.y;
-        entity.speed = entity.positionBuffer[len - 2].speed || entity.speed;
-
-        this.serverEntityMap[id].positionBuffer = [entity.positionBuffer[len - 1]];
-        console.warn('Entity had more than 5 elements in the position buffer, dumping them.', { id, elementsDumped: (len - 1) });
-      }
-
-      if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
-        this.timingGraph.addTimingEvent(pStartTime, TimingEventType.P_UPDATE);
-      }
-    }
-  }
-
-  private prev: number;
-
-  // -----------------------------------------------------------------------------------------------
   onServerEntityChange(id: string, allChanges: DataChange<any>[]) {
-    if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
-      const now = performance.now();
-      if (this.prev) console.log('TIME SINCE', now - this.prev);
-      this.prev = now;
-    }
     /*
     [
         {
@@ -390,6 +254,7 @@ export class Application extends PIXI.Application {
         }
     ]
     */
+
     let x: number;
     let y: number;
     let speed: number;
@@ -424,12 +289,6 @@ export class Application extends PIXI.Application {
       if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
         this.timingGraph.addTimingEventInstant(TimingEventType.P_ON_CHANGE);
       }
-
-      // if (this.serverEntityMap[id].positionBuffer.length > 3) {
-      // console.warn('Adding new position buffer to entity, though it has more than 3 elements.', { id, bufferLength: this.serverEntityMap[id].positionBuffer.length });
-      // const buffer = this.serverEntityMap[id].positionBuffer;
-      // this.serverEntityMap[id].positionBuffer = [buffer[buffer.length - 3], buffer[buffer.length - 2], buffer[buffer.length - 1]];
-      // }
     }
   }
 
@@ -446,23 +305,17 @@ export class Application extends PIXI.Application {
     return gfx;
   }
 
-  // set interpolation (bool: boolean) {
-  //     this._interpolation = bool;
+  // -----------------------------------------------------------------------------------------------
+  private lastTime: number;
+  loop(now: number) {
+    if(!this.lastTime) {
+      this.lastTime = now;
+    }
 
-  //     if (this._interpolation) {
-  //         this.loop();
-  //     }
-  // }
+    this.tick(now - this.lastTime);
 
-  // loop () {
-  //     for (let id in this.entities) {
-  //         this.entities[id].x = lerp(this.entities[id].x, this.room.state.entities[id].x, 0.2);
-  //         this.entities[id].y = lerp(this.entities[id].y, this.room.state.entities[id].y, 0.2);
-  //     }
+    this.lastTime = now;
 
-  //     // continue looping if interpolation is still enabled.
-  //     if (this._interpolation) {
-  //         requestAnimationFrame(this.loop.bind(this));
-  //     }
-  // }
+    requestAnimationFrame(this.loop.bind(this));
+  }
 }

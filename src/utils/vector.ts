@@ -13,7 +13,7 @@ export const distance = (x1: number, y1: number, x2: number, y2: number): number
   return Math.sqrt((dirX * dirX) + (dirY * dirY));
 }
 
-const l = (a: number, b: number, t: number) => (b - a) * t + a;
+const l = (a: number, b: number, t: number) => a + ((b - a) * t);
 
 export const lerp = (x1: number, y1: number, x2: number, y2: number, t: number, clamp?: number): { x: number, y: number } => {
   const xDiff = Math.abs(x2 - x1);

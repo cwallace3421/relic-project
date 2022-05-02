@@ -3,8 +3,8 @@ export default {
   PLAYER_SPEED: 120,
   PLAYER_RADIUS: 10,
   ROOM_NAME: "arena",
-  NETWORK_BROADCAST_RATE: 50, // 50ms = 20 packets a second
-  SIMULATION_TICK_RATE: 16.66, // 16.66 = 60fps
+  NETWORK_BROADCAST_RATE: 1000 / 20, // 50ms = 20 packets a second
+  SIMULATION_TICK_RATE: 1000 / 60, // 16.66 = 60fps
   ROCKET_RADIUS: 5,
   ROCKET_SPEED: 60,
   ROCKET_START_SPEED: 60,

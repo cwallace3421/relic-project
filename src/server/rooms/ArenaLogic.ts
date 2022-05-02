@@ -22,8 +22,7 @@ const onInit = (state: ArenaState) => {
 }
 
 const onTick = (state: ArenaState, delta: number): void => {
-  // const deltaTime: number = delta / 1000;
-  const deltaTime: number = constants.SIMULATION_TICK_RATE / 1000;
+  const deltaTime: number = delta / 1000;
 
   state.players.forEach((player, sessionId) => {
     onPlayerUpdate(sessionId, player, deltaTime);
@@ -240,4 +239,4 @@ export {
   onTick,
   onRocketSpawn,
   onRocketUpdate
-  };
+};

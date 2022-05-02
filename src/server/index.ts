@@ -60,7 +60,7 @@ gameServer.listen(port);
 if (process.env.NODE_ENV !== "production") {
   // const latencyOffset = Math.floor(Math.random() * 40);
   // gameServer.simulateLatency(100 - latencyOffset);
-  // gameServer.simulateLatency(80);
+  gameServer.simulateLatency(30);
 }
 
 console.log(`Listening on http://${endpoint}:${port}`);
