@@ -36,3 +36,12 @@ export const lerp = (x1: number, y1: number, x2: number, y2: number, t: number, 
     }
   }
 };
+
+export const lerpNumber = (n1: number, n2: number, t: number, clamp?: number): number => {
+  const diff = Math.abs(n2 - n1);
+  if (clamp) {
+    return diff < clamp ? n2 : l(n1, n2, t)
+  } else {
+    return l(n1, n2, t)
+  }
+};

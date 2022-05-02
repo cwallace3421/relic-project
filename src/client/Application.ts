@@ -9,39 +9,53 @@ import { TimingGraph, TimingEventType } from "./TimingGraph";
 import constants from "../utils/constants";
 import { Keyboard, UserActions } from "./Keyboard";
 import EntityHelper from "./EntityHelper";
+import { Actor, ActorType } from "./Actor";
+import { Rocket } from "./Rocket";
+import logger, { LogCodes } from "../utils/logger";
 
 const ENDPOINT = (process.env.NODE_ENV !== "production")
   ? "ws://localhost:8080"
   : "production";
 
-enum ServerEntityType {
+enum WorldEntityType {
   PLAYER = "PLAYER",
   BOT = "BOT",
   ROCKET = "ROCKET",
-}
-
-interface ServerEntity {
-  type: ServerEntityType;
-  speed: number;
-  positionBuffer: {
-    id: number;
-    timestamp: number;
-    timeElapsed?: number;
-    speed?: number;
-    x?: number;
-    y?: number;
-  }[];
-  gfx: PIXI.Graphics;
-  flag?: boolean;
 };
 
-interface ServerEntityMap {
-  [id: string]: ServerEntity
+type WorldEntityMap = {
+  [id: string]: WorldEntity;
 };
+
+type WorldEntity = {
+  type: WorldEntityType;
+  entity: Actor | Rocket;
+};
+
+// interface ServerEntity {
+//   type: ServerEntityType;
+//   speed: number;
+//   positionBuffer: {
+//     id: number;
+//     timestamp: number;
+//     timeElapsed?: number;
+//     speed?: number;
+//     x?: number;
+//     y?: number;
+//   }[];
+//   gfx: PIXI.Graphics;
+//   flag?: boolean;
+// };
+
+// interface ServerEntityMap {
+//   [id: string]: ServerEntity
+// };
+
+
 
 export class Application extends PIXI.Application {
-  serverEntityMap: ServerEntityMap = {};
-  clientEntity: ServerEntity;
+  worldEntityMap: WorldEntityMap = {};
+  clientEntity: WorldEntity;
 
   client: Client = new Client(ENDPOINT);
   room: Room<ArenaState>;
@@ -111,104 +125,80 @@ export class Application extends PIXI.Application {
     const playerName = (window as any).custom.name;
     this.room = await this.client.joinOrCreate<ArenaState>(constants.ROOM_NAME, { name: playerName });
 
-    this.room.state.players.onAdd = (playerEntity, sessionId: string) => {
-      const playerGraphics = this.createCircleInViewport(0xFFFF0B, playerEntity.x, playerEntity.y, playerEntity.radius);
+    // PLAYERS ------
+    this.room.state.players.onAdd = (playerServerEntity, sessionId: string) => {
+      const isClient = sessionId === this.room.sessionId;
+      const actor = new Actor(this.viewport)
+        .initGraphics(playerServerEntity.x, playerServerEntity.y, playerServerEntity.radius, 0xFFFF0B)
+        .initMeta(ActorType.PLAYER, isClient, sessionId, playerServerEntity.name)
+        .initProperties(playerServerEntity.speed);
 
-      const playerNameText = new PIXI.Text(playerEntity.name, new PIXI.TextStyle({
-        fill: "white",
-        align: "center",
-        fontSize: 12
-      }));
-      playerNameText.anchor.set(0.5, 1);
-      playerNameText.position.set(0, -(playerEntity.radius * 2));
-      playerGraphics.addChild(playerNameText);
-
-      this.serverEntityMap[sessionId] = {
-        type: ServerEntityType.PLAYER,
-        speed: playerEntity.speed,
-        gfx: playerGraphics,
-        positionBuffer: [],
+      this.worldEntityMap[sessionId] = {
+        type: WorldEntityType.PLAYER,
+        entity: actor,
       };
 
-      // If the local session id is the same as the incoming player entity, we want to store a reference to it.
-      // As it's our local player.
-      if (sessionId === this.room.sessionId) {
-        this.clientEntity = this.serverEntityMap[sessionId];
-        // this.viewport.follow(this.clientEntity);
-      }
+      if (isClient) this.clientEntity = this.worldEntityMap[sessionId];
 
-      playerEntity.onChange = (allChanges) => this.onServerEntityChange(sessionId, allChanges);
+      playerServerEntity.onChange = (changes) => actor.onStateChange(changes);
+      playerServerEntity.onRemove = () => {
+        if (!!this.worldEntityMap[sessionId]) {
+          actor.onEntityRemove(sessionId);
+          delete this.worldEntityMap[sessionId];
+          if (actor.getIsClient()) {
+            delete this.clientEntity;
+          }
+        } else {
+          logger.error('Attempting to remove player, but they do not exist in the server entity map.', LogCodes.CLIENT_ENTITY_ERROR, { sessionId });
+        }
+      };
     };
 
-    this.room.state.players.onRemove = (_, sessionId: string) => {
-      const entity = this.serverEntityMap[sessionId];
-      if (!!entity && entity.type === ServerEntityType.PLAYER) {
-        this.viewport.removeChild(entity.gfx);
-        entity.gfx.destroy();
-        delete this.serverEntityMap[sessionId];
-        console.log("Player left.", { sessionId });
-      } else {
-        console.error('Attempting to remove player, but they do not exist in the server entity map.', { sessionId });
-      }
-    };
+    // BOTS ------
+    this.room.state.bots.onAdd = (botServerEntity, botId) => {
+      const actor = new Actor(this.viewport)
+        .initGraphics(botServerEntity.x, botServerEntity.y, botServerEntity.radius, 0xFF550B)
+        .initMeta(ActorType.BOT, false, botId, botServerEntity.name)
+        .initProperties(botServerEntity.speed);
 
-    this.room.state.bots.onAdd = (botEntity, botId) => {
-      const botGraphics = this.createCircleInViewport(0xFF550B, botEntity.x, botEntity.y, botEntity.radius);
-
-      const botNameText = new PIXI.Text(botEntity.name, new PIXI.TextStyle({
-        fill: "white",
-        align: "center",
-        fontSize: 12
-      }));
-      botNameText.anchor.set(0.5, 1);
-      botNameText.position.set(0, -(botEntity.radius * 2));
-      botGraphics.addChild(botNameText);
-
-      this.serverEntityMap[botId] = {
-        type: ServerEntityType.BOT,
-        speed: botEntity.speed,
-        gfx: botGraphics,
-        positionBuffer: [],
+      this.worldEntityMap[botId] = {
+        type: WorldEntityType.BOT,
+        entity: actor,
       };
 
-      botEntity.onChange = (allChanges) => this.onServerEntityChange(botId, allChanges);
+      botServerEntity.onChange = (changes) => actor.onStateChange(changes);
+      botServerEntity.onRemove = () => {
+        if (!!this.worldEntityMap[botId]) {
+          actor.onEntityRemove(botId);
+          delete this.worldEntityMap[botId];
+        } else {
+          logger.error('Attempting to remove bot, but they do not exist in the server entity map.', LogCodes.CLIENT_ENTITY_ERROR, { botId });
+        }
+      };
     };
 
-    this.room.state.bots.onRemove = (_, botId: string) => {
-      const entity = this.serverEntityMap[botId];
-      if (!!entity && entity.type === ServerEntityType.BOT) {
-        this.viewport.removeChild(entity.gfx);
-        entity.gfx.destroy();
-        delete this.serverEntityMap[botId];
-        console.log("Player left.", { botId });
-      } else {
-        console.error('Attempting to remove bot, but they do not exist in the server entity map.', { botId });
-      }
-    };
+    // ROCKETS ------
+    this.room.state.rockets.onAdd = (rocketServerEntity, rocketId: string) => {
+      const rocket = new Rocket(this.viewport)
+        .initGraphics(rocketServerEntity.x, rocketServerEntity.y, rocketServerEntity.radius, 0xFF0000)
+        .initMeta(rocketId)
+        .initProperties(rocketServerEntity.speed);
 
-    this.room.state.rockets.onAdd = (rocketEntity, rocketId: string) => {
-      const rocketGfx = this.createCircleInViewport(0xFF0000, rocketEntity.x, rocketEntity.y, rocketEntity.radius);
-
-      this.serverEntityMap[rocketId] = {
-        type: ServerEntityType.ROCKET,
-        speed: rocketEntity.speed,
-        gfx: rocketGfx,
-        positionBuffer: [],
+      this.worldEntityMap[rocketId] = {
+        type: WorldEntityType.ROCKET,
+        entity: rocket,
       };
 
-      rocketEntity.onChange = (allChanges) => this.onServerEntityChange(rocketId, allChanges);
+      rocketServerEntity.onChange = (changes) => rocket.onStateChange(changes);
+      rocketServerEntity.onRemove = () => {
+        if (!!this.worldEntityMap[rocketId]) {
+          rocket.onEntityRemove(rocketId);
+          delete this.worldEntityMap[rocketId];
+        } else {
+          logger.error('Attempting to remove rocket, but they do not exist in the server entity map.', LogCodes.CLIENT_ENTITY_ERROR, { rocketId });
+        }
+      };
     };
-
-    this.room.state.rockets.onRemove = (_, rocketId: string) => {
-      const entity = this.serverEntityMap[rocketId];
-      if (!!entity && entity.type === ServerEntityType.ROCKET) {
-        this.viewport.removeChild(entity.gfx);
-        entity.gfx.destroy();
-        delete this.serverEntityMap[rocketId];
-      } else {
-        console.error('Attempting to remove rocket, but they do not exist in the server entity map.', { rocketId });
-      }
-    }
 
     this.pingPong.start(this.room);
   }
@@ -219,90 +209,15 @@ export class Application extends PIXI.Application {
 
     this.keyboard.tick(this.room, this.timingGraph);
 
-    for (const entityId in this.serverEntityMap) {
-      const entity = this.serverEntityMap[entityId];
-
-      const pos = EntityHelper.lerpBetweenPositionBuffers(entity, deltaTime, 0, 1);
-
-      if (pos) {
-        entity.gfx.x = pos.x;
-        entity.gfx.y = pos.y;
-      }
+    for (const entityId in this.worldEntityMap) {
+      const entity = this.worldEntityMap[entityId].entity;
+      entity.onTick(deltaTime);
     }
 
     this.pingPong.tick();
     this.timingGraph.tick();
 
     _tickComplete();
-  }
-
-  // -----------------------------------------------------------------------------------------------
-  onServerEntityChange(id: string, allChanges: DataChange<any>[]) {
-    /*
-    [
-        {
-            "op": 128,
-            "field": "x",
-            "value": 813.3449929623681,
-            "previousValue": 816.782534408259
-        },
-        {
-            "op": 128,
-            "field": "y",
-            "value": 499.735169805539,
-            "previousValue": 497.692986814771
-        }
-    ]
-    */
-
-    let x: number;
-    let y: number;
-    let speed: number;
-
-    allChanges.forEach(c => {
-      if (c.field === 'x' && c.value) {
-        x = c.value;
-      } else if (c.field === 'y' && c.value) {
-        y = c.value;
-      } else if (c.field === 'speed' && c.value) {
-        speed = c.value;
-      }
-
-    });
-
-    // Only push an entity change to the buffer if the x or y is changing
-    // TODO: Obv this won't work if the speed is changing.
-    if (x || y) {
-      const positionBuffer = this.serverEntityMap[id].positionBuffer;
-      const bufferToAdd = { timestamp: performance.now(), speed, x, y, id: Math.floor(Math.random() * 100000) };
-
-      if (positionBuffer.length > 0) {
-        const lastAddedBuffer = positionBuffer[positionBuffer.length - 1];
-        if (bufferToAdd.timestamp - lastAddedBuffer.timestamp > 80) {
-          if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) console.log('TIME DIFF TO PREVIOUSLY ADDED BUFFER', bufferToAdd.timestamp - lastAddedBuffer.timestamp);
-          positionBuffer.length = 0;
-        }
-      }
-
-      positionBuffer.push(bufferToAdd);
-
-      if (this.serverEntityMap[id].type === ServerEntityType.PLAYER) {
-        this.timingGraph.addTimingEventInstant(TimingEventType.P_ON_CHANGE);
-      }
-    }
-  }
-
-  // -----------------------------------------------------------------------------------------------
-  createCircleInViewport(color: number, x: number, y: number, radius: number): PIXI.Graphics {
-    const gfx = new PIXI.Graphics();
-    gfx.lineStyle(0);
-    gfx.beginFill(color);
-    gfx.drawCircle(0, 0, radius);
-    gfx.endFill();
-    gfx.x = x;
-    gfx.y = y;
-    this.viewport.addChild(gfx);
-    return gfx;
   }
 
   // -----------------------------------------------------------------------------------------------

@@ -11,4 +11,5 @@ export default {
   ROCKET_SPEED_INCREASE: 0.2,
   BOT_ENABLED: true,
   BOT_COUNT: 1,
+  SIMULATED_LATENCY: 10,
 };
