@@ -24,6 +24,9 @@ export class Player extends Schema {
     isRightPressed: boolean = false;
 
     @type("boolean")
+    isInteractPressed: boolean = false;
+
+    @type("boolean")
     dead: boolean = false;
 
     @type("float64")

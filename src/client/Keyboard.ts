@@ -8,6 +8,7 @@ export enum UserActions {
   PLAYER_LEFT = "PLAYER_LEFT",
   PLAYER_RIGHT = "PLAYER_RIGHT",
   DASH = "DASH",
+  INTERACT = "INTERACT",
   ZOOM_IN = "ZOOM_IN",
   ZOOM_OUT = "ZOOM_OUT",
   TOGGLE_MENU = "TOGGLE_MENU",
@@ -19,7 +20,8 @@ const UserActionsNetworked: UserActions[] = [
   UserActions.PLAYER_DOWN,
   UserActions.PLAYER_LEFT,
   UserActions.PLAYER_RIGHT,
-  UserActions.DASH
+  UserActions.DASH,
+  UserActions.INTERACT,
 ];
 
 export class Keyboard {
@@ -30,6 +32,7 @@ export class Keyboard {
     [UserActions.PLAYER_LEFT]: "a",
     [UserActions.PLAYER_RIGHT]: "d",
     [UserActions.DASH]: " ",
+    [UserActions.INTERACT]: "e",
     [UserActions.ZOOM_IN]: "+",
     [UserActions.ZOOM_OUT]: "-",
     [UserActions.TOGGLE_MENU]: "Escape",
@@ -42,6 +45,7 @@ export class Keyboard {
     [UserActions.PLAYER_LEFT]: false,
     [UserActions.PLAYER_RIGHT]: false,
     [UserActions.DASH]: false,
+    [UserActions.INTERACT]: false,
     [UserActions.ZOOM_IN]: false,
     [UserActions.ZOOM_OUT]: false,
     [UserActions.TOGGLE_MENU]: false,

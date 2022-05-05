@@ -19,6 +19,7 @@ enum UserActions {
   PLAYER_LEFT = "PLAYER_LEFT",
   PLAYER_RIGHT = "PLAYER_RIGHT",
   DASH = "DASH",
+  INTERACT = "INTERACT",
 }
 
 type UserActionMessage = { [key in UserActions]: boolean };
@@ -84,6 +85,7 @@ export class ArenaRoom extends Room<ArenaState> {
         isDownPressed: message[UserActions.PLAYER_DOWN],
         isLeftPressed: message[UserActions.PLAYER_LEFT],
         isRightPressed: message[UserActions.PLAYER_RIGHT],
+        isInteractPressed: message[UserActions.INTERACT],
       });
     }
   }
