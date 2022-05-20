@@ -1,6 +1,8 @@
+export type Point = { x: number, y: number };
+
 export const length = (x: number, y: number): number => Math.sqrt((x * x) + (y * y));
 
-export const normalize = (x: number, y: number): { x: number, y: number } => {
+export const normalize = (x: number, y: number): Point => {
   if (x === 0 && y === 0) return { x, y };
 
   const len = length(x, y);
@@ -13,9 +15,17 @@ export const distance = (x1: number, y1: number, x2: number, y2: number): number
   return Math.sqrt((dirX * dirX) + (dirY * dirY));
 }
 
+export const rotate = (x: number, y: number, degrees: number): Point => {
+  const rads = degrees * (Math.PI / 180);
+  return {
+    x: x * Math.cos(rads) - y * Math.sin(rads),
+    y: x * Math.sin(rads) + y * Math.cos(rads)
+  }
+}
+
 const l = (a: number, b: number, t: number) => a + ((b - a) * t);
 
-export const lerp = (x1: number, y1: number, x2: number, y2: number, t: number, clamp?: number): { x: number, y: number } => {
+export const lerp = (x1: number, y1: number, x2: number, y2: number, t: number, clamp?: number): Point => {
   const xDiff = Math.abs(x2 - x1);
   const yDiff = Math.abs(y2 - y1);
 

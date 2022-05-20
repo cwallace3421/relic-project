@@ -14,6 +14,12 @@ export class Rocket extends Schema {
     @type("float64")
     y!: number;
 
+    @type("float64")
+    directionX!: number;
+
+    @type("float64")
+    directionY!: number;
+
     @type("float32")
     radius: number = constants.ROCKET_RADIUS;
 
