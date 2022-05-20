@@ -2,6 +2,12 @@ import { Schema, type } from "@colyseus/schema";
 import constants from "../../utils/constants";
 
 export class Bot extends Schema {
+    @type("string")
+    id!: string;
+
+    @type("string")
+    name!: string;
+
     @type("float64")
     x!: number;
 
@@ -25,7 +31,4 @@ export class Bot extends Schema {
 
     @type("int16")
     difficulty = 0;
-
-    @type("string")
-    name!: string;
 }

@@ -2,6 +2,12 @@ import { Schema, type } from "@colyseus/schema";
 import constants from "../../utils/constants";
 
 export class Player extends Schema {
+    @type("string")
+    id!: string;
+
+    @type("string")
+    name!: string;
+
     @type("float64")
     x!: number;
 
@@ -31,9 +37,6 @@ export class Player extends Schema {
 
     @type("float64")
     speed = 0;
-
-    @type("string")
-    name!: string;
 
     static distance(a: Player, b: Player) {
         return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));

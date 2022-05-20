@@ -2,6 +2,12 @@ import { Schema, type } from "@colyseus/schema";
 import constants from "../../utils/constants";
 
 export class Rocket extends Schema {
+    @type("string")
+    id!: string;
+
+    @type("string")
+    targetId!: string;
+
     @type("float64")
     x!: number;
 
@@ -13,9 +19,6 @@ export class Rocket extends Schema {
 
     @type("float64")
     speed = 0;
-
-    @type("string")
-    targetId!: string;
 
     @type("boolean")
     active: boolean = false;

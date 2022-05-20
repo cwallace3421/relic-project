@@ -63,9 +63,10 @@ const onPlayerJoin = (state: ArenaState, client: Client, options: any) => {
   logger.info("Player joined room.", LogCodes.SERVER_PLAYER, { sessionId: client.sessionId });
 
   state.players.set(client.sessionId, new Player().assign({
+    id: client.sessionId,
+    name: options.name,
     x: Math.random() * state.width,
     y: Math.random() * state.height,
-    name: options.name,
     speed: constants.PLAYER_SPEED,
   }));
 };
@@ -126,11 +127,12 @@ const onRocketSpawn = (state: ArenaState): void => {
     const targetId = getRandomActorId(state);
     logger.info('Rocket has got target.', LogCodes.SERVER_ROCKET, { rocketId, targetId });
     state.rockets.set(rocketId, new Rocket().assign({
+      id: rocketId,
+      targetId,
+      speed: constants.ROCKET_SPEED,
       x: constants.WORLD_SIZE / 2,
       y: constants.WORLD_SIZE / 2,
       active: true,
-      targetId,
-      speed: constants.ROCKET_SPEED,
     }));
   } else {
     logger.error('Unable to spawn rocket as there is no players.', LogCodes.SERVER_ROCKET)
@@ -189,12 +191,13 @@ const onBotSpawn = (state: ArenaState) => {
 
   logger.info("Bot joined room.", LogCodes.SERVER_BOT, { botId, botName, difficulty });
   state.bots.set(botId, new Bot().assign({
+    id: botId,
+    name: botName,
     x: Math.random() * state.width,
     y: Math.random() * state.height,
     targetX: Math.random() * state.width,
     targetY: Math.random() * state.height,
     difficulty: difficulty,
-    name: botName,
     speed: constants.PLAYER_SPEED,
   }));
 };
