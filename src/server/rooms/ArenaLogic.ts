@@ -25,7 +25,7 @@ const onTick = (state: ArenaState, delta: number): void => {
   const deltaTime: number = delta / 1000;
 
   state.players.forEach((player, sessionId) => {
-    onPlayerUpdate(sessionId, player, deltaTime);
+    onPlayerUpdate(state, sessionId, deltaTime);
   });
 
   state.players.forEach((player, sessionId) => {
@@ -78,22 +78,25 @@ const onPlayerLeave = (state: ArenaState, client: Client) => {
   }
 };
 
-const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void => {
-  const speed = player.speed * delta;
+const onPlayerUpdate = (state: ArenaState, playerId: string, delta: number): void => {
+  const thisPlayer = state.players.get(playerId);
+  const speed = thisPlayer.speed * delta;
+
+  deflectRockets(state, playerId, thisPlayer);
 
   let dir = { x: 0, y: 0 };
 
-  if (player.isUpPressed === true) {
+  if (thisPlayer.isUpPressed === true) {
     dir.y = -1;
   }
-  else if (player.isDownPressed === true) {
+  else if (thisPlayer.isDownPressed === true) {
     dir.y = 1;
   }
 
-  if (player.isLeftPressed === true) {
+  if (thisPlayer.isLeftPressed === true) {
     dir.x = -1;
   }
-  else if (player.isRightPressed === true) {
+  else if (thisPlayer.isRightPressed === true) {
     dir.x = 1;
   }
 
@@ -101,28 +104,26 @@ const onPlayerUpdate = (sessionId: string, player: Player, delta: number): void 
     return;
   }
 
-  // console.log('pixels per second: ', (speed * 60));
-
   dir = normalize(dir.x, dir.y);
 
-  player.x += speed * dir.x;
-  player.y += speed * dir.y;
+  thisPlayer.x += speed * dir.x;
+  thisPlayer.y += speed * dir.y;
 
-  const minBounds = player.radius;
-  const maxBounds = constants.WORLD_SIZE - player.radius;
+  const minBounds = thisPlayer.radius;
+  const maxBounds = constants.WORLD_SIZE - thisPlayer.radius;
 
-  if (player.y < minBounds) { player.y = minBounds; }
-  if (player.y > maxBounds) { player.y = maxBounds; }
+  if (thisPlayer.y < minBounds) { thisPlayer.y = minBounds; }
+  if (thisPlayer.y > maxBounds) { thisPlayer.y = maxBounds; }
 
-  if (player.x < minBounds) { player.x = minBounds; }
-  if (player.x > maxBounds) { player.x = maxBounds; }
+  if (thisPlayer.x < minBounds) { thisPlayer.x = minBounds; }
+  if (thisPlayer.x > maxBounds) { thisPlayer.x = maxBounds; }
 };
 
 const onRocketSpawn = (state: ArenaState): void => {
   logger.info('Attempting to spawn one rocket.', LogCodes.SERVER_ROCKET);
   if (state.players.size > 0) {
     const rocketId = generateId();
-    const targetId = getRandomPlayerId(state);
+    const targetId = getRandomActorId(state);
     logger.info('Rocket has got target.', LogCodes.SERVER_ROCKET, { rocketId, targetId });
     state.rockets.set(rocketId, new Rocket().assign({
       x: constants.WORLD_SIZE / 2,
@@ -146,30 +147,38 @@ const onRocketUpdate = (state: ArenaState, rocketId: string, delta: number): voi
     return;
   }
 
-  const targetPlayer = state.players.get(targetId);
-  if (!targetPlayer) {
+  const targetActor = getActor(state, targetId);
+  if (!targetActor) {
     logger.error('Rocket target id does not point to a existing player.', LogCodes.SERVER_ROCKET, { rocketId, targetId });
     return;
   }
 
-  const dir = normalize(targetPlayer.x - rocket.x, targetPlayer.y - rocket.y);
+  const dir = normalize(targetActor.x - rocket.x, targetActor.y - rocket.y);
   rocket.x += speed * dir.x;
   rocket.y += speed * dir.y;
 
-  if (distance(rocket.x, rocket.y, targetPlayer.x, targetPlayer.y) < 1) {
-    rocket.x = targetPlayer.x;
-    rocket.y = targetPlayer.y;
+  if (distance(rocket.x, rocket.y, targetActor.x, targetActor.y) < 1) {
+    rocket.x = targetActor.x;
+    rocket.y = targetActor.y;
   }
 
-  const collided = circle(rocket.x, rocket.y, rocket.radius, targetPlayer.x, targetPlayer.y, targetPlayer.radius);
+  const collided = circle(rocket.x, rocket.y, rocket.radius, targetActor.x, targetActor.y, targetActor.radius);
   if (collided) {
-    const newTargetId = getRandomPlayerId(state, [targetId]);
-    if (newTargetId) {
-      rocket.assign({ targetId: newTargetId });
-    } else {
-      logger.error('Unable to get new target for rocket, destorying rocket.', LogCodes.SERVER_ROCKET, { rocketId });
-      rocket.assign({active: false});
-    }
+    retargetRocket(state, rocketId, rocket, targetId);
+    // TODO: Kill collided target
+  }
+};
+
+const retargetRocket = (state: ArenaState, rocketId: string, rocket: Rocket, previousTargetId: string): boolean => {
+  const newTargetId = getRandomActorId(state, previousTargetId ? [previousTargetId] : []);
+  if (newTargetId) {
+    logger.info('Rocket is being deflected, retargeting.', LogCodes.SERVER_ROCKET, { rocketId, oldTargetId: rocket.targetId, newTargetId });
+    rocket.assign({ targetId: newTargetId });
+    return true;
+  } else {
+    logger.error('Unable to get new target for rocket, destorying rocket.', LogCodes.SERVER_ROCKET, { rocketId });
+    rocket.assign({ active: false });
+    return false;
   }
 };
 
@@ -200,6 +209,8 @@ const onBotUpdate = (state: ArenaState, botId: string, delta: number) => {
     });
   }
 
+  deflectRockets(state, botId, thisBot);
+
   const speed = thisBot.speed * delta;
   const dirX = thisBot.targetX - thisBot.x;
   const dirY = thisBot.targetY - thisBot.y;
@@ -224,10 +235,36 @@ const onBotUpdate = (state: ArenaState, botId: string, delta: number) => {
   }
 };
 
-const getRandomPlayerId = (state: ArenaState, exclude: Array<string> = []): string => {
-  const filteredPlayerIds = [...state.players.keys()].filter((id) => !exclude.includes(id));
-  const randomIndex = Math.floor(Math.random() * (state.players.size - exclude.length));
-  return filteredPlayerIds[randomIndex];
+const deflectRockets = (state: ArenaState, actorId: string, actor: Player | Bot): void => {
+  state.rockets.forEach((rocket, id) => {
+    if (actorId === rocket.targetId) {
+      const collided = circle(rocket.x, rocket.y, rocket.radius, actor.x, actor.y, actor.radius * 2);
+      if (collided) {
+        retargetRocket(state, id, rocket, actorId);
+        if (rocket.speed < constants.ROCKET_MAX_SPEED) {
+          const newSpeed = Math.min(rocket.speed * (constants.ROCKET_SPEED_INCREASE + 1), constants.ROCKET_MAX_SPEED);
+          rocket.assign({ speed: newSpeed });
+        }
+      }
+    }
+  });
+};
+
+const getRandomActorId = (state: ArenaState, exclude: Array<string> = []): string | undefined => {
+  const playerIdMap: { id: string, type: "PLAYER" | "BOT" }[] = [...state.players.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: "PLAYER" }));
+  const botIdMap: { id: string, type: "PLAYER" | "BOT" }[] = [...state.bots.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: "BOT" }));
+
+  const idMap = [...botIdMap]; // [...playerIdMap, ...botIdMap];
+
+  if (idMap.length === 0) return;
+
+  const randomIndex = Math.floor(Math.random() * (idMap.length - exclude.length));
+
+  return idMap[randomIndex].id;
+}
+
+const getActor = (state: ArenaState, id: string): Player | Bot | undefined => {
+  return state.players.get(id) ?? state.bots.get(id) ?? undefined;
 }
 
 export {
