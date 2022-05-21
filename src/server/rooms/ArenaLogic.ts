@@ -157,16 +157,24 @@ const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void 
     return;
   }
 
-  const dir = normalize(targetActor.x - rocket.x, targetActor.y - rocket.y);
-  rocket.x += speed * dir.x;
-  rocket.y += speed * dir.y;
+  const distanceToTarget = distance(rocket.x, rocket.y, targetActor.x, targetActor.y); // Distance from center of rocket to center of target
 
-  if (distance(rocket.x, rocket.y, targetActor.x, targetActor.y) < 1) {
-    rocket.x = targetActor.x;
-    rocket.y = targetActor.y;
+  const dir = normalize(targetActor.x - rocket.x, targetActor.y - rocket.y);
+
+  let collided = false;
+
+  if (distanceToTarget <= (rocket.radius + targetActor.radius)) {
+    const toMove = (rocket.radius + targetActor.radius);
+    rocket.x += toMove * dir.x;
+    rocket.y += toMove * dir.y;
+    collided = true;
+  } else {
+    rocket.x += speed * dir.x;
+    rocket.y += speed * dir.y;
   }
 
-  const collided = circle(rocket.x, rocket.y, rocket.radius, targetActor.x, targetActor.y, targetActor.radius);
+  collided = collided || circle(rocket.x, rocket.y, rocket.radius, targetActor.x, targetActor.y, targetActor.radius);
+
   if (collided) {
     retargetRocket(state, rocket);
     // TODO: Kill collided target
