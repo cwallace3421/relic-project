@@ -1,4 +1,4 @@
-import http from "http";
+import * as http from "http";
 import { Client, generateId } from "colyseus";
 
 import { ArenaState } from "./ArenaState";
@@ -11,6 +11,9 @@ import { circle } from '../../utils/collision';
 import { getRandomBotName } from '../../utils/botnames';
 import { Rocket } from "./Rocket";
 import { Bot } from "./Bot";
+import { VectorMath } from '../../utils/VectorMath';
+import { Victor } from '../../utils/Victor';
+import e = require("express");
 
 const onInit = (state: ArenaState) => {
   logger.info("Arena room created.", LogCodes.ARENA_ROOM);
@@ -213,37 +216,31 @@ const onBotSpawn = (state: ArenaState) => {
 };
 
 const onBotUpdate = (state: ArenaState, bot: Bot, delta: number) => {
-  const changeTargetChance = Math.floor(Math.random() * 200);
-  if (changeTargetChance > 198) {
-    bot.assign({
-      targetX: Math.random() * state.width,
-      targetY: Math.random() * state.height,
-    });
-  }
+  const botPosition = bot.getPosition();
+  const targetPosition = bot.getTargetPosition();
 
   deflectRockets(state, bot);
 
   const speed = bot.speed * delta;
-  const dirX = bot.targetX - bot.x;
-  const dirY = bot.targetY - bot.y;
-
-  const dir = normalize(dirX, dirY);
-
-  bot.x += speed * dir.x;
-  bot.y += speed * dir.y;
-
   const minBounds = bot.radius;
   const maxBounds = constants.WORLD_SIZE - bot.radius;
 
-  if (bot.y < minBounds) { bot.y = minBounds; }
-  if (bot.y > maxBounds) { bot.y = maxBounds; }
+  const dir = VectorMath.direction(botPosition, targetPosition).normalize();
+  const newPosition = botPosition.clone().add(dir.multiplyScalar(speed));
 
-  if (bot.x < minBounds) { bot.x = minBounds; }
-  if (bot.x > maxBounds) { bot.x = maxBounds; }
+  VectorMath.min(newPosition, maxBounds);
+  VectorMath.max(newPosition, minBounds);
 
-  if (distance(bot.x, bot.y, bot.targetX, bot.targetY) < 1) {
-    bot.x = bot.targetX;
-    bot.y = bot.targetY;
+  if (newPosition.distance(targetPosition) < 1) {
+    Bot.setPosition(bot, targetPosition);
+  } else {
+    Bot.setPosition(bot, newPosition);
+  }
+
+  // Decide if the Bot should choose a new location to move to.
+  const changeTargetChance = Math.floor(Math.random() * 200);
+  if (changeTargetChance > 198) {
+    Bot.setTargetPositionXY(bot, Math.random() * state.width, Math.random() * state.height);
   }
 };
 

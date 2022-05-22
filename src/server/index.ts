@@ -7,11 +7,11 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 import { Server } from "colyseus";
-import http from "http";
-import express from "express";
-import path from "path";
-import jwt from "jsonwebtoken";
-import cookieParser from "cookie-parser";
+import * as http from "http";
+import * as express from "express";
+import * as path from "path";
+import * as jwt from "jsonwebtoken";
+import * as cookieParser from "cookie-parser";
 
 import { ArenaRoom } from "./rooms/ArenaRoom";
 import constants from "../utils/constants";

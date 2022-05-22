@@ -1,4 +1,4 @@
-import http from "http";
+import * as http from "http";
 import { Room, Client, Delayed } from "colyseus";
 import { Player } from "./Player";
 import { ArenaState } from "./ArenaState";

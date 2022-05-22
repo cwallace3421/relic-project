@@ -2,7 +2,7 @@ import * as PIXI from "pixi.js";
 import * as Viewport from "pixi-viewport";
 import { Room, Client } from "colyseus.js";
 import { DataChange } from "@colyseus/schema";
-import { ArenaState } from "../server/rooms/ArenaState";
+import type { ArenaState } from "../server/rooms/ArenaState";
 import { distance, lerp, normalize } from "../utils/vector";
 import { PingPong } from "./PingPong";
 import { TimingGraph, TimingEventType } from "./TimingGraph";

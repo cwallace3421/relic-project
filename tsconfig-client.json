@@ -4,10 +4,10 @@
         "module": "commonjs",
         "experimentalDecorators": true,
         "lib": ["es6", "dom"],
-        "jsx": "react",
-        "target": "es5",
+        "target": "es2017",
         "declaration": true,
         "noImplicitAny": false,
+        "esModuleInterop": false,
         "sourceMap": false
     },
     "include": [
