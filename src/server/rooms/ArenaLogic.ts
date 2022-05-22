@@ -2,18 +2,16 @@ import * as http from "http";
 import { Client, generateId } from "colyseus";
 
 import { ArenaState } from "./ArenaState";
-import { Player } from "./Player";
-import logger, { LogCodes } from '../../utils/logger';
-import constants from "../../utils/constants";
-import { distance, normalize, rotate } from '../../utils/vector';
-import { randomNumberInRange } from '../../utils/random';
-import { circle } from '../../utils/collision';
-import { getRandomBotName } from '../../utils/botnames';
-import { Rocket } from "./Rocket";
 import { Bot } from "./Bot";
+import { Collision } from '../../utils/Collision';
+import { getRandomBotName } from '../../utils/botnames';
+import { Player } from "./Player";
+import { randomNumberInRange } from '../../utils/random';
+import { Rocket } from "./Rocket";
 import { VectorMath } from '../../utils/VectorMath';
 import { Victor } from '../../utils/Victor';
-import e = require("express");
+import constants from "../../utils/constants";
+import logger, { LogCodes } from '../../utils/logger';
 
 const onInit = (state: ArenaState) => {
   logger.info("Arena room created.", LogCodes.ARENA_ROOM);
@@ -84,43 +82,41 @@ const onPlayerLeave = (state: ArenaState, client: Client) => {
 };
 
 const onPlayerUpdate = (state: ArenaState, player: Player, delta: number): void => {
-  const speed = player.speed * delta;
 
   deflectRockets(state, player);
 
-  let dir = { x: 0, y: 0 };
+  const moveDirection = new Victor(0, 0);
 
   if (player.isUpPressed === true) {
-    dir.y = -1;
+    moveDirection.y = -1;
   }
   else if (player.isDownPressed === true) {
-    dir.y = 1;
+    moveDirection.y = 1;
   }
 
   if (player.isLeftPressed === true) {
-    dir.x = -1;
+    moveDirection.x = -1;
   }
   else if (player.isRightPressed === true) {
-    dir.x = 1;
+    moveDirection.x = 1;
   }
 
-  if (dir.x === 0 && dir.y === 0) {
+  if (moveDirection.x === 0 && moveDirection.y === 0) {
     return;
   }
 
-  dir = normalize(dir.x, dir.y);
-
-  player.x += speed * dir.x;
-  player.y += speed * dir.y;
-
+  const speed = player.speed * delta;
   const minBounds = player.radius;
   const maxBounds = constants.WORLD_SIZE - player.radius;
 
-  if (player.y < minBounds) { player.y = minBounds; }
-  if (player.y > maxBounds) { player.y = maxBounds; }
+  const newPlayerPosition = player.getPosition().clone();
 
-  if (player.x < minBounds) { player.x = minBounds; }
-  if (player.x > maxBounds) { player.x = maxBounds; }
+  newPlayerPosition.add(moveDirection.normalize().multiplyScalar(speed));
+
+  VectorMath.min(newPlayerPosition, maxBounds);
+  VectorMath.max(newPlayerPosition, minBounds);
+
+  Player.setPosition(player, newPlayerPosition);
 };
 
 const onRocketSpawn = (state: ArenaState): void => {
@@ -128,7 +124,7 @@ const onRocketSpawn = (state: ArenaState): void => {
   if (state.players.size > 0) {
     const rocketId = generateId();
     const targetId = getRandomActorId(state);
-    const spawnDirection = rotate(0, 1, randomNumberInRange(0, 360)); // TODO: Maybe should spawn pointing at the first target?
+    const spawnDirection = Victor.getZero().rotateDeg(randomNumberInRange(0, 360)).normalize(); // TODO: Maybe should spawn pointing at the first target?
     logger.info('Rocket has got target.', LogCodes.SERVER_ROCKET, { rocketId, targetId, spawnDirection });
     state.rockets.set(rocketId, new Rocket().assign({
       id: rocketId,
@@ -146,8 +142,6 @@ const onRocketSpawn = (state: ArenaState): void => {
 };
 
 const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void => {
-  const speed = rocket.speed * delta;
-
   const targetId = rocket.targetId;
   if (!targetId) {
     logger.error('Rocket does not have a populated target.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id });
@@ -160,23 +154,27 @@ const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void 
     return;
   }
 
-  const distanceToTarget = distance(rocket.x, rocket.y, targetActor.x, targetActor.y); // Distance from center of rocket to center of target
+  const speed = rocket.speed * delta;
+  const overlapDistance = rocket.radius + targetActor.radius;
 
-  const dir = normalize(targetActor.x - rocket.x, targetActor.y - rocket.y);
+  const rocketPosition = rocket.getPosition();
+  const targetActorPosition = targetActor.getPosition();
+
+  const distanceToTarget = rocketPosition.distance(targetActorPosition); // Distance from center of rocket to center of target
+  const directionToTarget = VectorMath.direction(rocketPosition, targetActorPosition).normalize();
+  const newRocketPosition = rocketPosition.clone();
 
   let collided = false;
 
-  if (distanceToTarget <= (rocket.radius + targetActor.radius)) {
-    const toMove = (rocket.radius + targetActor.radius);
-    rocket.x += toMove * dir.x;
-    rocket.y += toMove * dir.y;
+  if (distanceToTarget <= overlapDistance) {
+    Rocket.setPosition(rocket, newRocketPosition.add(directionToTarget.multiplyScalar(overlapDistance)));
     collided = true;
   } else {
-    rocket.x += speed * dir.x;
-    rocket.y += speed * dir.y;
+    Rocket.setPosition(rocket, newRocketPosition.add(directionToTarget.multiplyScalar(speed)));
+    collided = false;
   }
 
-  collided = collided || circle(rocket.x, rocket.y, rocket.radius, targetActor.x, targetActor.y, targetActor.radius);
+  collided = collided || Collision.circle(newRocketPosition, rocket.radius, targetActorPosition, targetActor.radius);
 
   if (collided) {
     retargetRocket(state, rocket);
@@ -225,16 +223,16 @@ const onBotUpdate = (state: ArenaState, bot: Bot, delta: number) => {
   const minBounds = bot.radius;
   const maxBounds = constants.WORLD_SIZE - bot.radius;
 
-  const dir = VectorMath.direction(botPosition, targetPosition).normalize();
-  const newPosition = botPosition.clone().add(dir.multiplyScalar(speed));
+  const directionToTarget = VectorMath.direction(botPosition, targetPosition).normalize();
+  const newBotPosition = botPosition.clone().add(directionToTarget.multiplyScalar(speed));
 
-  VectorMath.min(newPosition, maxBounds);
-  VectorMath.max(newPosition, minBounds);
+  VectorMath.min(newBotPosition, maxBounds);
+  VectorMath.max(newBotPosition, minBounds);
 
-  if (newPosition.distance(targetPosition) < 1) {
+  if (newBotPosition.distance(targetPosition) < 1) {
     Bot.setPosition(bot, targetPosition);
   } else {
-    Bot.setPosition(bot, newPosition);
+    Bot.setPosition(bot, newBotPosition);
   }
 
   // Decide if the Bot should choose a new location to move to.
@@ -247,7 +245,7 @@ const onBotUpdate = (state: ArenaState, bot: Bot, delta: number) => {
 const deflectRockets = (state: ArenaState, actor: Player | Bot): void => {
   state.rockets.forEach((rocket) => {
     if (actor.id === rocket.targetId) {
-      const collided = circle(rocket.x, rocket.y, rocket.radius, actor.x, actor.y, actor.radius * 2);
+      const collided = Collision.circle(rocket.getPosition(), rocket.radius, actor.getPosition(), actor.radius * 2);
       if (collided) {
         retargetRocket(state, rocket);
         if (rocket.speed < constants.ROCKET_MAX_SPEED) {

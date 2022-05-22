@@ -1,6 +1,8 @@
-import { distance } from "./vector";
+import { Victor } from "./Victor";
 
-export const circle = (x1: number, y1: number, r1: number, x2: number, y2: number, r2: number): boolean => {
-  const dist = distance(x1, y1, x2, y2);
-  return dist < (r1 + r2);
-};
+export class Collision {
+  static circle(aPos: Victor, aRadius: number, bPos: Victor, bRadius: number): boolean {
+    const distance = aPos.distance(bPos);
+    return distance < (aRadius + bRadius);;
+  }
+}

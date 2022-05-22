@@ -2,6 +2,8 @@ const degrees = 180 / Math.PI;
 
 export class Victor {
 
+  private static zero = new Victor(0, 0);
+
   public x = 0;
 
   public y = 0;
@@ -395,24 +397,27 @@ export class Victor {
     return 'x:' + this.x + ', y:' + this.y;
   };
 
-  toArray() {
+  toArray(): number[] {
     return [this.x, this.y];
   };
 
-  toObject() {
+  toObject(): { x: number, y: number } {
     return { x: this.x, y: this.y };
   };
 
-  static random(min: number, max: number) {
+  static random(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1) + min);
   }
 
-  static radian2degrees(rad: number) {
+  static radian2degrees(rad: number): number {
     return rad * degrees;
   }
 
-  static degrees2radian(deg: number) {
+  static degrees2radian(deg: number): number {
     return deg / degrees;
   }
-};
 
+  static getZero(): Victor {
+    return this.zero.clone();
+  }
+};
