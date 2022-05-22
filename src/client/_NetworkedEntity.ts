@@ -1,5 +1,5 @@
 import { DataChange } from "@colyseus/schema";
-import { lerp } from "../utils/vector";
+import { lerp, lerpAngle } from "../utils/vector";
 import logger, { LogCodes } from "../utils/logger";
 import constants from "../utils/constants";
 
@@ -114,9 +114,13 @@ export abstract class _NetworkedEntity {
         this.setX(lerpedPos.x);
         this.setY(lerpedPos.y);
 
-        if (packetOne.rotation) {
-          // TODO: Slerp rotation between the two packets.
-          this.setRotation(packetOne.rotation);
+        if (!!packetOne.rotation || !!packetTwo.rotation) {
+          const rotationOne = packetOne.rotation || this.getRotation();
+          const rotationTwo = packetTwo.rotation || this.getRotation();
+
+          const lerpedRot = lerpAngle(rotationOne, rotationTwo, rate);
+
+          this.setRotation(lerpedRot);
         }
       }
     }

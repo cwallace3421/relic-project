@@ -55,3 +55,11 @@ export const lerpNumber = (n1: number, n2: number, t: number, clamp?: number): n
     return l(n1, n2, t)
   }
 };
+
+const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
+const repeat = (t: number, m: number) => clamp(t - Math.floor(t / m) * m, 0, m);
+
+export const lerpAngle = (fromAngle: number, toAngle: number, t: number): number => {
+  const dt = repeat(toAngle - fromAngle, 360);
+  return l(fromAngle, fromAngle + (dt > 180 ? dt - 360 : dt), t);
+}
