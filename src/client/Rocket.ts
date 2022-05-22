@@ -1,6 +1,6 @@
 import type * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
-import { _NetworkedEntity } from "./_NetworkedEntity";
+import { EntityStateChange, _NetworkedEntity } from "./_NetworkedEntity";
 import logger, { LogCodes } from "../utils/logger";
 
 export class Rocket extends _NetworkedEntity {
@@ -12,6 +12,7 @@ export class Rocket extends _NetworkedEntity {
 
   private speed: number;
   private radius: number;
+  private rotation: number;
   private color: number;
 
   // -----------------------------------------------------------------------------------------------
@@ -73,6 +74,12 @@ export class Rocket extends _NetworkedEntity {
   }
 
   // @Override -------------------------------------------------------------------------------------
+  public setRotation(degrees: number): void {
+    this.rotation = degrees;
+    this.graphics.angle = degrees;
+  }
+
+  // @Override -------------------------------------------------------------------------------------
   public getX(): number {
     return this.graphics.x;
   }
@@ -82,12 +89,18 @@ export class Rocket extends _NetworkedEntity {
     return this.graphics.y;
   }
 
+  // @Override -------------------------------------------------------------------------------------
+  public getRotation(): number {
+    return this.rotation;
+  }
+
   // -----------------------------------------------------------------------------------------------
   private createGraphics(x: number, y: number): PIXI.Graphics {
     const gfx = new PIXI.Graphics();
     gfx.lineStyle(0);
     gfx.beginFill(this.color);
     gfx.drawCircle(0, 0, this.radius);
+    gfx.drawRect(0, -(this.radius / 2), this.radius * 3, this.radius);
     gfx.endFill();
     gfx.x = x;
     gfx.y = y;

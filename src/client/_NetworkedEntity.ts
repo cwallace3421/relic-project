@@ -8,6 +8,7 @@ export type EntityStateChange = {
   id: string;
   x?: number;
   y?: number;
+  rotation?: number;
   speed?: number;
   color?: number; // TODO: NOT SYNCED
 }
@@ -32,10 +33,16 @@ export abstract class _NetworkedEntity {
     public abstract setY(y: number): void;
 
     // -----------------------------------------------------------------------------------------------
+    public abstract setRotation(degrees: number): void;
+
+    // -----------------------------------------------------------------------------------------------
     public abstract getX(): number;
 
     // -----------------------------------------------------------------------------------------------
     public abstract getY(): number;
+
+    // -----------------------------------------------------------------------------------------------
+    public abstract getRotation(): number;
 
     // -----------------------------------------------------------------------------------------------
     public onTick(deltaTime: number): void {
@@ -47,20 +54,23 @@ export abstract class _NetworkedEntity {
       let x: number;
       let y: number;
       let speed: number;
+      let rotation: number;
 
       changes.forEach(c => {
         if (c.field === 'x' && c.value) {
           x = c.value;
         } else if (c.field === 'y' && c.value) {
           y = c.value;
+        } else if (c.field === 'rotation' && c.value) {
+          rotation = c.value;
         } else if (c.field === 'speed' && c.value) {
           speed = c.value;
         }
       });
 
-      if (x || y || speed) {
+      if (x || y || speed || rotation) {
         this.changes.count += 1;
-        const dataToAdd: EntityStateChange = { timestamp: performance.now(), id: `${this.changes.count}`, x, y, speed };
+        const dataToAdd: EntityStateChange = { timestamp: performance.now(), id: `${this.changes.count}`, x, y, speed, rotation };
 
         const len = this.changes.data.length;
         if (len > 0) {
@@ -103,6 +113,11 @@ export abstract class _NetworkedEntity {
 
         this.setX(lerpedPos.x);
         this.setY(lerpedPos.y);
+
+        if (packetOne.rotation) {
+          // TODO: Slerp rotation between the two packets.
+          this.setRotation(packetOne.rotation);
+        }
       }
     }
 

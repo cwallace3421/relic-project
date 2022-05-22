@@ -132,6 +132,7 @@ const onRocketSpawn = (state: ArenaState): void => {
       speed: constants.ROCKET_SPEED,
       x: constants.WORLD_SIZE / 2,
       y: constants.WORLD_SIZE / 2,
+      rotation: spawnDirection.angleDeg(),
       directionX: spawnDirection.x,
       directionY: spawnDirection.y,
       active: true,
@@ -163,6 +164,8 @@ const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void 
   const distanceToTarget = rocketPosition.distance(targetActorPosition); // Distance from center of rocket to center of target
   const directionToTarget = VectorMath.direction(rocketPosition, targetActorPosition).normalize();
   const newRocketPosition = rocketPosition.clone();
+
+  Rocket.setDirection(rocket, directionToTarget);
 
   let collided = false;
 

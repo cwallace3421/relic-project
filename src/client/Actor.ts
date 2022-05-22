@@ -1,6 +1,6 @@
 import type * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
-import { _NetworkedEntity } from "./_NetworkedEntity";
+import { EntityStateChange, _NetworkedEntity } from "./_NetworkedEntity";
 import logger, { LogCodes } from "../utils/logger";
 
 export enum ActorType {
@@ -79,6 +79,9 @@ export class Actor extends _NetworkedEntity {
   }
 
   // @Override -------------------------------------------------------------------------------------
+  public setRotation(degrees: number): void { }
+
+  // @Override -------------------------------------------------------------------------------------
   public getX(): number {
     return this.graphics.x;
   }
@@ -86,6 +89,16 @@ export class Actor extends _NetworkedEntity {
   // @Override -------------------------------------------------------------------------------------
   public getY(): number {
     return this.graphics.y;
+  }
+
+  // @Override -------------------------------------------------------------------------------------
+  public getRotation(): number {
+    return NaN;
+  }
+
+  // @Override -------------------------------------------------------------------------------------
+  public onTickDataChange(change: EntityStateChange): void {
+
   }
 
   // -----------------------------------------------------------------------------------------------
