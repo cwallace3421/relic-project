@@ -114,13 +114,15 @@ export abstract class _NetworkedEntity {
         this.setX(lerpedPos.x);
         this.setY(lerpedPos.y);
 
-        if (!!packetOne.rotation || !!packetTwo.rotation) {
+        if (!!packetOne.rotation && !!packetTwo.rotation) {
           const rotationOne = packetOne.rotation || this.getRotation();
           const rotationTwo = packetTwo.rotation || this.getRotation();
 
           const lerpedRot = lerpAngle(rotationOne, rotationTwo, rate);
 
           this.setRotation(lerpedRot);
+        } else if (!!packetOne.rotation || !!packetTwo.rotation) {
+          this.setRotation(packetOne.rotation || packetTwo.rotation);
         }
       }
     }

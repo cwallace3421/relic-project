@@ -10,6 +10,7 @@ import { randomNumberInRange } from '../../utils/random';
 import { Rocket } from "./Rocket";
 import { VectorMath } from '../../utils/VectorMath';
 import { Victor } from '../../utils/Victor';
+import { lerpAngle } from '../../utils/vector';
 import constants from "../../utils/constants";
 import logger, { LogCodes } from '../../utils/logger';
 
@@ -124,7 +125,7 @@ const onRocketSpawn = (state: ArenaState): void => {
   if (state.players.size > 0) {
     const rocketId = generateId();
     const targetId = getRandomActorId(state);
-    const spawnDirection = Victor.getZero().rotateDeg(randomNumberInRange(0, 360)).normalize(); // TODO: Maybe should spawn pointing at the first target?
+    const spawnDirection = Victor.getZero().rotateToDeg(randomNumberInRange(0, 360)).normalize(); // TODO: Maybe should spawn pointing at the first target?
     logger.info('Rocket has got target.', LogCodes.SERVER_ROCKET, { rocketId, targetId, spawnDirection });
     state.rockets.set(rocketId, new Rocket().assign({
       id: rocketId,
@@ -159,21 +160,25 @@ const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void 
   const overlapDistance = rocket.radius + targetActor.radius;
 
   const rocketPosition = rocket.getPosition();
+  const rocketDirection = rocket.getDirection();
   const targetActorPosition = targetActor.getPosition();
 
-  const distanceToTarget = rocketPosition.distance(targetActorPosition); // Distance from center of rocket to center of target
   const directionToTarget = VectorMath.direction(rocketPosition, targetActorPosition).normalize();
-  const newRocketPosition = rocketPosition.clone();
 
-  Rocket.setDirection(rocket, directionToTarget);
+  const newAngle = lerpAngle(rocketDirection.angleDeg(), directionToTarget.angleDeg(), (rocket.speed / 70) * delta); // TODO: Magic number
+  const newRocketDirection = rocketDirection.clone().rotateToDeg(newAngle).normalize();
+  Rocket.setDirection(rocket, newRocketDirection);
 
   let collided = false;
 
+  const newRocketPosition = rocketPosition.clone();
+  const distanceToTarget = newRocketPosition.distance(targetActorPosition); // Distance from center of rocket to center of target
+
   if (distanceToTarget <= overlapDistance) {
-    Rocket.setPosition(rocket, newRocketPosition.add(directionToTarget.multiplyScalar(overlapDistance)));
+    Rocket.setPosition(rocket, newRocketPosition.add(newRocketDirection.multiplyScalar(overlapDistance)));
     collided = true;
   } else {
-    Rocket.setPosition(rocket, newRocketPosition.add(directionToTarget.multiplyScalar(speed)));
+    Rocket.setPosition(rocket, newRocketPosition.add(newRocketDirection.multiplyScalar(speed)));
     collided = false;
   }
 
@@ -251,6 +256,8 @@ const deflectRockets = (state: ArenaState, actor: Player | Bot): void => {
       const collided = Collision.circle(rocket.getPosition(), rocket.radius, actor.getPosition(), actor.radius * 2);
       if (collided) {
         retargetRocket(state, rocket);
+        const directionToTarget = VectorMath.direction(rocket.getPosition(), actor.getPosition()).normalize();
+        Rocket.setDirection(rocket, directionToTarget.invert());
         if (rocket.speed < constants.ROCKET_MAX_SPEED) {
           const newSpeed = Math.round(Math.min(rocket.speed * (constants.ROCKET_SPEED_INCREASE + 1), constants.ROCKET_MAX_SPEED));
           rocket.assign({ speed: newSpeed });
@@ -264,7 +271,7 @@ const getRandomActorId = (state: ArenaState, exclude: Array<string> = []): strin
   const playerIdMap: { id: string, type: "PLAYER" | "BOT" }[] = [...state.players.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: "PLAYER" }));
   const botIdMap: { id: string, type: "PLAYER" | "BOT" }[] = [...state.bots.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: "BOT" }));
 
-  const idMap = [...botIdMap]; // [...playerIdMap, ...botIdMap];
+  const idMap = [...playerIdMap, ...botIdMap]; // [...playerIdMap, ...botIdMap];
 
   if (idMap.length === 0) return;
 
