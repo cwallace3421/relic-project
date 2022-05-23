@@ -127,6 +127,8 @@ export class Application extends PIXI.Application {
 
     // PLAYERS ------
     this.room.state.players.onAdd = (playerServerEntity, sessionId: string) => {
+      logger.info('Player joined the game', LogCodes.CLIENT_ENTITY_INFO, { ...playerServerEntity });
+
       const isClient = sessionId === this.room.sessionId;
       const actor = new Actor(this.viewport)
         .initMeta(ActorType.PLAYER, isClient, sessionId, playerServerEntity.name)
@@ -140,7 +142,7 @@ export class Application extends PIXI.Application {
 
       if (isClient) this.clientEntity = this.worldEntityMap[sessionId];
 
-      playerServerEntity.onChange = (changes) => actor.onStateChange(changes);
+      playerServerEntity.onChange = (changes) => actor.onStateChange(sessionId, changes);
       playerServerEntity.onRemove = () => {
         if (!!this.worldEntityMap[sessionId]) {
           actor.onEntityRemove(sessionId);
@@ -166,7 +168,7 @@ export class Application extends PIXI.Application {
         entity: actor,
       };
 
-      botServerEntity.onChange = (changes) => actor.onStateChange(changes);
+      botServerEntity.onChange = (changes) => actor.onStateChange(botId, changes);
       botServerEntity.onRemove = () => {
         if (!!this.worldEntityMap[botId]) {
           actor.onEntityRemove(botId);
@@ -189,7 +191,7 @@ export class Application extends PIXI.Application {
         entity: rocket,
       };
 
-      rocketServerEntity.onChange = (changes) => rocket.onStateChange(changes);
+      rocketServerEntity.onChange = (changes) => rocket.onStateChange(rocketId, changes);
       rocketServerEntity.onRemove = () => {
         if (!!this.worldEntityMap[rocketId]) {
           rocket.onEntityRemove(rocketId);

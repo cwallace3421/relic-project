@@ -29,10 +29,10 @@ export const lerp = (x1: number, y1: number, x2: number, y2: number, t: number, 
   const xDiff = Math.abs(x2 - x1);
   const yDiff = Math.abs(y2 - y1);
 
-  if (xDiff > 15 || yDiff > 15) {
-    // This threshold was randomly chosen, just to make sure that the difference isn't growing. And the the lerp is keeping up mostly.
-    console.error('Lerping is not catching up', { xDiff, yDiff });
-  }
+  // if (xDiff > 15 || yDiff > 15) {
+  //   // This threshold was randomly chosen, just to make sure that the difference isn't growing. And the the lerp is keeping up mostly.
+  //   console.error('Lerping is not catching up', { xDiff, yDiff, temp });
+  // }
 
   if (clamp) {
     return {

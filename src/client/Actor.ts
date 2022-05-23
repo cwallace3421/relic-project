@@ -2,6 +2,7 @@ import type * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
 import { EntityStateChange, _NetworkedEntity } from "./_NetworkedEntity";
 import logger, { LogCodes } from "../utils/logger";
+import constants from "../utils/constants";
 
 export enum ActorType {
   PLAYER = "PLAYER",
@@ -110,11 +111,20 @@ export class Actor extends _NetworkedEntity {
   private createGraphics(x: number, y: number): PIXI.Graphics {
     const gfx = new PIXI.Graphics();
     gfx.lineStyle(0);
+
+    if (this.isClient) {
+      gfx.beginFill(0xffffff, 0.1);
+      gfx.drawCircle(0, 0, constants.DEFLECT_RADIUS);
+      gfx.endFill();
+    }
+
     gfx.beginFill(this.color);
     gfx.drawCircle(0, 0, this.radius);
     gfx.endFill();
+
     gfx.x = x;
     gfx.y = y;
+
     this.viewport.addChild(gfx);
 
     const textStyle = new PIXI.TextStyle({

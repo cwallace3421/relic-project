@@ -4,6 +4,7 @@ import logger, { LogCodes } from "../utils/logger";
 import constants from "../utils/constants";
 
 export type EntityStateChange = {
+  entityId: string;
   timestamp: number;
   id: string;
   x?: number;
@@ -50,7 +51,7 @@ export abstract class _NetworkedEntity {
     }
 
     // -----------------------------------------------------------------------------------------------
-    public onStateChange(changes: DataChange<any>[]): void {
+    public onStateChange(entityId: string, changes: DataChange<any>[]): void {
       let x: number;
       let y: number;
       let speed: number;
@@ -70,7 +71,7 @@ export abstract class _NetworkedEntity {
 
       if (x || y || speed || rotation) {
         this.changes.count += 1;
-        const dataToAdd: EntityStateChange = { timestamp: performance.now(), id: `${this.changes.count}`, x, y, speed, rotation };
+        const dataToAdd: EntityStateChange = { entityId, timestamp: performance.now(), id: `${this.changes.count}`, x, y, speed, rotation };
 
         const len = this.changes.data.length;
         if (len > 0) {

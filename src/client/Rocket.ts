@@ -100,7 +100,7 @@ export class Rocket extends _NetworkedEntity {
     gfx.lineStyle(0);
     gfx.beginFill(this.color);
     gfx.drawCircle(0, 0, this.radius);
-    gfx.drawRect(0, -(this.radius / 2), this.radius * 3, this.radius);
+    gfx.drawRect(0, -(this.radius / 2), this.radius * 1.5, this.radius);
     gfx.endFill();
     gfx.x = x;
     gfx.y = y;

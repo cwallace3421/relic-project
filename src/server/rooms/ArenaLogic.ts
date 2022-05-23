@@ -67,7 +67,7 @@ const onPlayerJoin = (state: ArenaState, client: Client, options: any) => {
 
   state.players.set(client.sessionId, new Player().assign({
     id: client.sessionId,
-    name: options.name,
+    name: `${options.name} [${client.sessionId}]`,
     x: Math.random() * state.width,
     y: Math.random() * state.height,
     speed: constants.PLAYER_SPEED,
@@ -83,9 +83,7 @@ const onPlayerLeave = (state: ArenaState, client: Client) => {
 };
 
 const onPlayerUpdate = (state: ArenaState, player: Player, delta: number): void => {
-
-  deflectRockets(state, player);
-
+  // Player Movement
   const moveDirection = new Victor(0, 0);
 
   if (player.isUpPressed === true) {
@@ -102,22 +100,29 @@ const onPlayerUpdate = (state: ArenaState, player: Player, delta: number): void 
     moveDirection.x = 1;
   }
 
-  if (moveDirection.x === 0 && moveDirection.y === 0) {
-    return;
+  if (moveDirection.x !== 0 || moveDirection.y !== 0) {
+    const speed = player.speed * delta;
+    const minBounds = player.radius;
+    const maxBounds = constants.WORLD_SIZE - player.radius;
+
+    const newPlayerPosition = player.getPosition().clone();
+
+    newPlayerPosition.add(moveDirection.normalize().multiplyScalar(speed));
+
+    VectorMath.min(newPlayerPosition, maxBounds);
+    VectorMath.max(newPlayerPosition, minBounds);
+
+    Player.setPosition(player, newPlayerPosition);
   }
 
-  const speed = player.speed * delta;
-  const minBounds = player.radius;
-  const maxBounds = constants.WORLD_SIZE - player.radius;
-
-  const newPlayerPosition = player.getPosition().clone();
-
-  newPlayerPosition.add(moveDirection.normalize().multiplyScalar(speed));
-
-  VectorMath.min(newPlayerPosition, maxBounds);
-  VectorMath.max(newPlayerPosition, minBounds);
-
-  Player.setPosition(player, newPlayerPosition);
+  // Player Interaction
+  if (player.isInteractPressed && player.interactedPressedTime < 120) {
+    logger.info('Interact is currently pressed.', LogCodes.SERVER_PLAYER, { timePressed: player.interactedPressedTime });
+    deflectRockets(state, player);
+    player.interactedPressedTime += (delta * 1000);
+  } else if (!player.isInteractPressed && player.interactedPressedTime !== 0) {
+    player.interactedPressedTime = 0;
+  }
 };
 
 const onRocketSpawn = (state: ArenaState): void => {
@@ -125,12 +130,12 @@ const onRocketSpawn = (state: ArenaState): void => {
   if (state.players.size > 0) {
     const rocketId = generateId();
     const targetId = getRandomActorId(state);
-    const spawnDirection = Victor.getZero().rotateToDeg(randomNumberInRange(0, 360)).normalize(); // TODO: Maybe should spawn pointing at the first target?
+    const spawnDirection = Victor.getIdentity().rotateToDeg(randomNumberInRange(0, 360)).normalize(); // TODO: Maybe should spawn pointing at the first target?
     logger.info('Rocket has got target.', LogCodes.SERVER_ROCKET, { rocketId, targetId, spawnDirection });
     state.rockets.set(rocketId, new Rocket().assign({
       id: rocketId,
       targetId,
-      speed: constants.ROCKET_SPEED,
+      speed: constants.ROCKET_START_SPEED,
       x: constants.WORLD_SIZE / 2,
       y: constants.WORLD_SIZE / 2,
       rotation: spawnDirection.angleDeg(),
@@ -152,7 +157,8 @@ const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void 
 
   const targetActor = getActor(state, targetId);
   if (!targetActor) {
-    logger.error('Rocket target id does not point to a existing player.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, targetId });
+    logger.error('Rocket target id does not point to a existing player. Retargeting.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, targetId });
+    retargetRocket(state, rocket);
     return;
   }
 
@@ -186,6 +192,16 @@ const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void 
 
   if (collided) {
     retargetRocket(state, rocket);
+    const spawnDirection = Victor.getIdentity().rotateToDeg(randomNumberInRange(0, 360)).normalize();
+    rocket.assign({
+      speed: constants.ROCKET_START_SPEED,
+      x: constants.WORLD_SIZE / 2,
+      y: constants.WORLD_SIZE / 2,
+      rotation: spawnDirection.angleDeg(),
+      directionX: spawnDirection.x,
+      directionY: spawnDirection.y
+    });
+    // The rocket is going to lerp towards the middle. It's not gonna look right lol
     // TODO: Kill collided target
   }
 };
@@ -193,7 +209,7 @@ const onRocketUpdate = (state: ArenaState, rocket: Rocket, delta: number): void 
 const retargetRocket = (state: ArenaState, rocket: Rocket): boolean => {
   const newTargetId = getRandomActorId(state, [rocket.targetId]);
   if (newTargetId) {
-    logger.info('Rocket is being deflected, retargeting.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, oldTargetId: rocket.targetId, newTargetId });
+    logger.info('Rocket is being retargeted.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, oldTargetId: rocket.targetId, newTargetId });
     rocket.assign({ targetId: newTargetId });
     return true;
   } else {
@@ -206,7 +222,7 @@ const retargetRocket = (state: ArenaState, rocket: Rocket): boolean => {
 const onBotSpawn = (state: ArenaState) => {
   const difficulty = Math.floor(Math.random() * 8);
   const botId = generateId();
-  const botName = getRandomBotName(` (D:${difficulty})`);
+  const botName = getRandomBotName(''); //getRandomBotName(` (D:${difficulty})`);
 
   logger.info("Bot joined room.", LogCodes.SERVER_BOT, { botId, botName, difficulty });
   state.bots.set(botId, new Bot().assign({
@@ -253,7 +269,7 @@ const onBotUpdate = (state: ArenaState, bot: Bot, delta: number) => {
 const deflectRockets = (state: ArenaState, actor: Player | Bot): void => {
   state.rockets.forEach((rocket) => {
     if (actor.id === rocket.targetId) {
-      const collided = Collision.circle(rocket.getPosition(), rocket.radius, actor.getPosition(), actor.radius * 2);
+      const collided = Collision.circle(rocket.getPosition(), rocket.radius, actor.getPosition(), constants.DEFLECT_RADIUS);
       if (collided) {
         retargetRocket(state, rocket);
         const directionToTarget = VectorMath.direction(rocket.getPosition(), actor.getPosition()).normalize();
@@ -262,6 +278,7 @@ const deflectRockets = (state: ArenaState, actor: Player | Bot): void => {
           const newSpeed = Math.round(Math.min(rocket.speed * (constants.ROCKET_SPEED_INCREASE + 1), constants.ROCKET_MAX_SPEED));
           rocket.assign({ speed: newSpeed });
         }
+        logger.info('Rocket deflected by actor.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, actorId: actor.id, speed: rocket.speed });
       }
     }
   });

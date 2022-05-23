@@ -4,6 +4,8 @@ export class Victor {
 
   private static zero = new Victor(0, 0);
 
+  private static identity = new Victor(1, 1);
+
   public x = 0;
 
   public y = 0;
@@ -407,17 +409,21 @@ export class Victor {
 
   static random(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1) + min);
-  }
+  };
 
   static radian2degrees(rad: number): number {
     return rad * degrees;
-  }
+  };
 
   static degrees2radian(deg: number): number {
     return deg / degrees;
-  }
+  };
 
   static getZero(): Victor {
     return this.zero.clone();
+  };
+
+  static getIdentity(): Victor {
+    return this.identity.clone();
   }
 };

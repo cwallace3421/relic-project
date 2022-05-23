@@ -24,7 +24,7 @@ export class ArenaState extends Schema {
   @type("uint8")
   height: number = constants.WORLD_SIZE;
 
-  @filterChildren(clientSideFilterEntities)
+  // @filterChildren(clientSideFilterEntities) // TODO: Revisit - the current range is too small for the arena we have. Do we actually need this for this game?
   @type({ map: Player })
   players: MapSchema<Player> = new MapSchema<Player>();
 

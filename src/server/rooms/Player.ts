@@ -39,6 +39,8 @@ export class Player extends Schema {
   @type("float64")
   speed = 0;
 
+  interactedPressedTime: number = 0;
+
   position: Victor = new Victor(0, 0);
 
   getPosition(): Victor {
