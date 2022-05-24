@@ -9,7 +9,7 @@ export function onJoin(this: Room) {
     let changeDirectionTimeout;
 
     const changeDirection = () => {
-        this.send(['mouse', { x: Math.random() * 2000, y: Math.random() * 2000 }]);
+        this.send('mouse', { x: Math.random() * 2000, y: Math.random() * 2000 });
         changeDirectionTimeout = setTimeout(() => changeDirection(), Math.random() * 4000);
     }
 

@@ -23,8 +23,7 @@ const endpoint = "localhost";
 let STATIC_DIR: string;
 
 const gameServer = new Server({
-  server: http.createServer(app),
-  express: app
+  server: http.createServer(app)
 });
 
 if (process.env.NODE_ENV !== "production") {
