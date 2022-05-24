@@ -1,16 +1,24 @@
 {
-    "compilerOptions": {
-        "outDir": "lib",
-        "module": "commonjs",
-        "experimentalDecorators": true,
-        "lib": ["es6", "dom"],
-        "target": "es2017",
-        "declaration": true,
-        "noImplicitAny": false,
-        "esModuleInterop": false,
-        "sourceMap": false
-    },
-    "include": [
-      "src/client/**/*.ts",
-    ]
+  "compilerOptions": {
+    "module": "commonjs",
+    "experimentalDecorators": true,
+    "moduleResolution": "node",
+    "lib": [
+      "es6",
+      "dom"
+    ],
+    "target": "es2017",
+    "declaration": false,
+    "allowSyntheticDefaultImports": false,
+    "esModuleInterop": false,
+    "noImplicitAny": false,
+    "inlineSourceMap": true
+  },
+  "include": [
+    "src/client/**/*.ts",
+    "src/utils/**/*.ts",
+  ],
+  "exclude": [
+    "./node_modules"
+  ]
 }

@@ -1,21 +1,16 @@
 import * as PIXI from "pixi.js";
 import * as Viewport from "pixi-viewport";
 import { Room, Client } from "colyseus.js";
-import { DataChange } from "@colyseus/schema";
 import type { ArenaState } from "../server/rooms/ArenaState";
-import { distance, lerp, normalize } from "../utils/vector";
 import { PingPong } from "./PingPong";
 import { TimingGraph, TimingEventType } from "./TimingGraph";
 import constants from "../utils/constants";
 import { Keyboard, UserActions } from "./Keyboard";
-import EntityHelper from "./EntityHelper";
 import { Actor, ActorType } from "./Actor";
 import { Rocket } from "./Rocket";
 import logger, { LogCodes } from "../utils/logger";
 
-const ENDPOINT = (process.env.NODE_ENV !== "production")
-  ? "ws://localhost:8080"
-  : "production";
+const ENDPOINT = `ws://${window.location.host}`;
 
 enum WorldEntityType {
   PLAYER = "PLAYER",

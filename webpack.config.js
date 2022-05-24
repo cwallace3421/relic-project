@@ -7,8 +7,8 @@ module.exports = function (options) {
   return {
     mode: process.env.NODE_ENV || "development",
     entry: [
-      'webpack-hot-middleware/client?reload=true',
-      './src/client/index.ts'
+      './src/client/index.ts',
+      ...(process.env.NODE_ENV !== "production" ? ['webpack-hot-middleware/client?reload=true'] : []),
     ],
     module: {
       rules: [
@@ -30,8 +30,8 @@ module.exports = function (options) {
       extensions: ['.tsx', '.ts', '.js']
     },
     output: {
-      filename: 'bundle.js',
-      path: path.resolve(__dirname, 'lib', 'public')
+      filename: 'client.js',
+      path: path.resolve(__dirname, 'build', 'public')
     }
   };
 }

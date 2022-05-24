@@ -90,7 +90,7 @@ export class Keyboard {
       }
     });
 
-    console.log('Send Keyboard State', message);
+    // console.log('Send Keyboard State', message);
     room.send('user_action', message);
 
     this.state.DIRTY = false;

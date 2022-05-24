@@ -7,11 +7,11 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 import { Server } from "colyseus";
-import * as http from "http";
-import * as express from "express";
-import * as path from "path";
-import * as jwt from "jsonwebtoken";
-import * as cookieParser from "cookie-parser";
+import http from "http";
+import express from "express";
+import path from "path";
+import jwt from "jsonwebtoken";
+import cookieParser from "cookie-parser";
 
 import { ArenaRoom } from "./rooms/ArenaRoom";
 import constants from "../utils/constants";
@@ -34,10 +34,9 @@ if (process.env.NODE_ENV !== "production") {
 
   // on development, use "../../" as static root
   STATIC_DIR = path.resolve(__dirname, "..", "..");
-
 } else {
   // on production, use ./public as static root
-  STATIC_DIR = path.resolve(__dirname, "public");
+  STATIC_DIR = path.resolve(__dirname, "..", "..", "public");
 }
 
 app.use(cookieParser());
@@ -53,6 +52,12 @@ app.post('/login', (req, res) => {
   });
   res.send({ success: true });
 });
+
+if (process.env.NODE_ENV === "production") {
+  app.get('/', (req, res) => {
+    res.sendFile(path.resolve(__dirname, "..", "..", "public", 'index.html'));
+  });
+}
 
 gameServer.define(constants.ROOM_NAME, ArenaRoom);
 gameServer.listen(port);

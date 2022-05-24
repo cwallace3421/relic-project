@@ -16,7 +16,11 @@ export enum LogCodes {
 }
 
 const log = (level: LogLevels, message: string, logCode: LogCodes, data?: any): void => {
-  console[level](message, logCode, data);
+  if (data) {
+    console[level](message, logCode, data);
+  } else {
+    console[level](message, logCode);
+  }
 };
 
 export default {

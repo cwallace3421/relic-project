@@ -4,10 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "schema-codegen": "schema-codegen src/server/rooms/*.ts --ts --output src/client/schema/",
-    "heroku-postbuild": "tsc && webpack",
-    "start": "node ./lib/index.js",
-    "dev": "nodemon"
+    "build:client": "cross-env NODE_ENV=production webpack",
+    "build:server": "cross-env NODE_ENV=production tsc",
+    "build": "npm run build:client && npm run build:server",
+    "start": "cross-env NODE_ENV=production node ./build/private/server/index.js",
+    "dev": "nodemon",
+    "schema-codegen": "schema-codegen src/server/rooms/*.ts --ts --output src/client/schema/"
   },
   "author": "Endel Dreyer",
   "license": "MIT",
@@ -16,6 +18,7 @@
     "@types/express": "^4.16.1",
     "@types/jsonwebtoken": "^8.5.0",
     "@types/redis": "^2.8.12",
+    "cross-env": "^7.0.3",
     "debug": "^4.1.1",
     "extract-text-webpack-plugin": "^4.0.0-beta.0",
     "file-loader": "^3.0.1",
