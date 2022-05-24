@@ -1,0 +1,24 @@
+name: king-prawn-app
+region: lon
+services:
+- environment_slug: node-js
+  envs:
+  - key: APP_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${APP_URL}
+  - key: APP_DOMAIN
+    scope: RUN_AND_BUILD_TIME
+    value: ${APP_DOMAIN}
+  github:
+    branch: main
+    repo: cwallace3421/relic-project
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  name: relic-project
+  routes:
+  - path: /
+  - path: /login
+  build_command: npm run build
+  run_command: npm start
+  source_dir: /
