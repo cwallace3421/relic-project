@@ -10,7 +10,7 @@ services:
     scope: RUN_AND_BUILD_TIME
     value: ${APP_DOMAIN}
   github:
-    branch: main
+    branch: attempt-to-fix-digitalocean-build-failure
     repo: cwallace3421/relic-project
   http_port: 8080
   instance_count: 1

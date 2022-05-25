@@ -4,7 +4,7 @@
   "description": "a video game",
   "scripts": {
     "build:client": "cross-env NODE_ENV=production webpack",
-    "build:server": "cross-env NODE_ENV=production tsc",
+    "build:server": "tsc --listFilesOnly && cross-env NODE_ENV=production tsc --build --verbose",
     "build": "npm run build:client && npm run build:server",
     "start": "cross-env NODE_ENV=production node ./build/private/server/index.js",
     "dev": "nodemon ./src/server/index.ts",
