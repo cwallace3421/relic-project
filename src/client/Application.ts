@@ -10,7 +10,7 @@ import { Actor, ActorType } from "./Actor";
 import { Rocket } from "./Rocket";
 import logger, { LogCodes } from "../utils/logger";
 
-const ENDPOINT = `ws://${window.location.host}`;
+const ENDPOINT = `wss://${window.location.host}`;
 
 enum WorldEntityType {
   PLAYER = "PLAYER",
