@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "rootDir": "./src",
     "module": "commonjs",
     "experimentalDecorators": true,
     "moduleResolution": "node",
@@ -15,8 +16,8 @@
     "inlineSourceMap": true
   },
   "include": [
-    "src/client/**/*.ts",
-    "src/utils/**/*.ts",
+    "./src/client/**/*.ts",
+    "./src/utils/**/*.ts",
   ],
   "exclude": [
     "./node_modules"

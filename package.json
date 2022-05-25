@@ -40,6 +40,6 @@
     "jsonwebtoken": "^8.5.1"
   },
   "engines": {
-    "node": ">=16.x.x"
+    "node": "16.x"
   }
 }

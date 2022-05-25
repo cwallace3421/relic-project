@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "rootDir": "./src",
     "outDir": "build/private",
     "module": "commonjs",
     "experimentalDecorators": true,
@@ -16,8 +17,8 @@
     "inlineSourceMap": true
   },
   "include": [
-    "src/server/**/*.ts",
-    "src/utils/**/*.ts",
+    "./src/server/**/*.ts",
+    "./src/utils/**/*.ts",
   ],
   "exclude": [
     "./node_modules"
