@@ -4,7 +4,7 @@ export default {
 
   NETWORK_BROADCAST_RATE: 1000 / 20, // 50ms = 20 packets a second
   SIMULATION_TICK_RATE: 1000 / 60, // 16.66 = 60fps
-  SIMULATED_LATENCY: 20,
+  SIMULATED_LATENCY: 20, // this is latency for both outgoing and incoming, so this value is doubled in the real world
 
   PLAYER_SPEED: 120,
   PLAYER_RADIUS: 10,

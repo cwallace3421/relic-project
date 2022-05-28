@@ -39,8 +39,6 @@ export class ArenaRoom extends Room<ArenaState> {
     });
 
     this.onMessage("ping", (client: Client, message: any) => {
-      message.messageRecievedByServer = Date.now();
-      message.messageSentToClient = Date.now();
       client.send('pong', message);
     });
 

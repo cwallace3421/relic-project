@@ -5,8 +5,6 @@ import constants from '../utils/constants';
 
 type PingData = {
   messageSentToServer: number;
-  messageRecievedByServer: number;
-  messageSentToClient: number;
   messageRecievedByClient: number;
 };
 
@@ -16,6 +14,7 @@ export class PingManager {
 
   private pings: PingData[] = [];
   private pingsMaxLength: number = 10;
+  private isDirty: boolean = false;
 
   private interval: number = 100;
 
@@ -33,17 +32,7 @@ export class PingManager {
   }
 
   // -----------------------------------------------------------------------------------------------
-  private init() {
-    // this.graphics = this.scene.add.text(0, 0 , '', {
-    //   color: "rgb(255,255,255)",
-    //   align: "right",
-    //   fontSize: '12'
-    // }).setOrigin(1, 0);
-  }
-
-  private getGfxText(outgoing: number, incoming: number) {
-    return `${outgoing.toString().padEnd(5)} ms - out\n${incoming.toString().padEnd(5)} ms - in`
-  }
+  private init() {}
 
   // -----------------------------------------------------------------------------------------------
   public start(room: Room) {
@@ -54,9 +43,7 @@ export class PingManager {
     setInterval(() => {
       room.send('ping', {
         messageSentToServer: Date.now(),
-        messageRecievedByServer: null,
-        messageSentToClient: null,
-        messageRecievedByClient: null
+        messageRecievedByClient: null,
       });
     }, this.interval);
 
@@ -69,19 +56,26 @@ export class PingManager {
       }
 
       this.pings.push(message);
+
+      this.isDirty = true;
     });
   }
 
   // -----------------------------------------------------------------------------------------------
   public tick() {
     if (!this.enabled) return;
+    if (!this.isDirty) return;
+    if (this.pings.length === 0) return;
 
-    if (this.pings.length === this.pingsMaxLength) {
-      const outgoing: Array<number> = this.pings.map((ping) => ping.messageRecievedByServer - ping.messageSentToServer);
-      const incoming: Array<number> = this.pings.map((ping) => ping.messageRecievedByClient - ping.messageSentToClient);
-      const outgoingAverage = outgoing.reduce((p, c) => p + c) / this.pingsMaxLength;
-      const incomingAverage = incoming.reduce((p, c) => p + c) / this.pingsMaxLength;
-      this.graphics.setText(this.getGfxText(outgoingAverage, incomingAverage));
-    }
+    const timings = this.pings.map((ping) => ping.messageRecievedByClient - ping.messageSentToServer);
+    const average = timings.reduce((p, c) => p + c) / timings.length;
+    this.graphics.setText(this.getGfxText(average));
+
+    this.isDirty = false;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  private getGfxText(pingMS: number) {
+    return `${pingMS.toFixed(2).padEnd(6, '0')} ms`
   }
 }
