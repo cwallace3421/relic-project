@@ -1,14 +1,13 @@
-import type * as Viewport from "pixi-viewport";
-import * as PIXI from "pixi.js";
-import { EntityStateChange, _NetworkedEntity } from "./_NetworkedEntity";
-import logger, { LogCodes } from "../utils/logger";
+import Phaser from 'phaser';
+import { _NetworkedEntity } from "./base/_NetworkedEntity";
+import logger, { LogCodes } from "../../utils/logger";
 
 export class Rocket extends _NetworkedEntity {
 
   private id: string;
 
-  private viewport: Viewport;
-  private graphics: PIXI.Graphics;
+  private scene: Phaser.Scene;
+  private container: Phaser.GameObjects.Container;
 
   private speed: number;
   private radius: number;
@@ -16,20 +15,14 @@ export class Rocket extends _NetworkedEntity {
   private color: number;
 
   // -----------------------------------------------------------------------------------------------
-  constructor (viewport: Viewport) {
+  constructor (scene: Phaser.Scene) {
     super();
-
-    this.viewport = viewport;
+    this.scene = scene;
   }
 
   // -----------------------------------------------------------------------------------------------
   public initMeta(id: string): Rocket {
     this.id = id;
-
-    // if (this.isClient) {
-    //   this.viewport.follow(this.graphics);
-    // }
-
     return this;
   }
 
@@ -43,7 +36,7 @@ export class Rocket extends _NetworkedEntity {
   public initGraphics(x: number, y: number, radius: number, color: number): Rocket {
     this.radius = radius;
     this.color = color;
-    this.graphics = this.createGraphics(x, y);
+    this.createGraphics(x, y);
     return this;
   }
 
@@ -55,8 +48,8 @@ export class Rocket extends _NetworkedEntity {
   // @Override -------------------------------------------------------------------------------------
   public onEntityRemove(id: string): void {
     if (id === this.id) {
-      this.viewport.removeChild(this.graphics);
-      this.graphics.destroy();
+      this.container.destroy();
+      delete this.container;
       logger.info("Rocket Entity Removed.", LogCodes.CLIENT_ENTITY_INFO, { id: this.id });
     } else {
       logger.info("Trying to remove Rocket Entity with incorrect id.", LogCodes.CLIENT_ENTITY_INFO, { id: this.id, providedId: id });
@@ -65,28 +58,28 @@ export class Rocket extends _NetworkedEntity {
 
   // @Override -------------------------------------------------------------------------------------
   public setX(x: number): void {
-    this.graphics.x = x;
+    this.container.x = x;
   }
 
   // @Override -------------------------------------------------------------------------------------
   public setY(y: number): void {
-    this.graphics.y = y;
+    this.container.y = y;
   }
 
   // @Override -------------------------------------------------------------------------------------
   public setRotation(degrees: number): void {
     this.rotation = degrees;
-    this.graphics.angle = degrees;
+    this.container.angle = degrees;
   }
 
   // @Override -------------------------------------------------------------------------------------
   public getX(): number {
-    return this.graphics.x;
+    return this.container.x;
   }
 
   // @Override -------------------------------------------------------------------------------------
   public getY(): number {
-    return this.graphics.y;
+    return this.container.y;
   }
 
   // @Override -------------------------------------------------------------------------------------
@@ -95,16 +88,9 @@ export class Rocket extends _NetworkedEntity {
   }
 
   // -----------------------------------------------------------------------------------------------
-  private createGraphics(x: number, y: number): PIXI.Graphics {
-    const gfx = new PIXI.Graphics();
-    gfx.lineStyle(0);
-    gfx.beginFill(this.color);
-    gfx.drawCircle(0, 0, this.radius);
-    gfx.drawRect(0, -(this.radius / 2), this.radius * 1.5, this.radius);
-    gfx.endFill();
-    gfx.x = x;
-    gfx.y = y;
-    this.viewport.addChild(gfx);
-    return gfx;
+  private createGraphics(x: number, y: number): void {
+    const circle = this.scene.add.ellipse(0, 0, this.radius * 2, this.radius * 2, this.color);
+    const nozzle = this.scene.add.rectangle(0, 0, this.radius * 1.5, this.radius, this.color).setOrigin(0, 0.5);
+    this.container = this.scene.add.container(x, y, [circle, nozzle]);
   }
 }

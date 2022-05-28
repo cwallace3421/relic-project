@@ -1,4 +1,4 @@
-import { Application } from "./Application";
+import { initGame } from './GameManager';
 
 document.getElementById('login-btn').addEventListener("click", (e) => {
   const name = (document.getElementById('login-text') as HTMLInputElement).value;
@@ -30,13 +30,11 @@ document.getElementById('login-btn').addEventListener("click", (e) => {
 function startApplication() {
   document.getElementById('login-container').remove();
 
-  const app = new Application();
+  const app = initGame();
+
+  window.addEventListener('resize', function () {
+    app.scale.resize(window.innerWidth, window.innerHeight);
+  }, false);
+
   (window as any).app = app;
-
-  document.body.appendChild(app.view);
-
-  window.onresize = () => {
-    app.viewport.resize(window.innerWidth, window.innerHeight);
-    app.renderer.resize(window.innerWidth, window.innerHeight);
-  }
 }

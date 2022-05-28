@@ -1,10 +1,12 @@
-let webpack, webpackDevMiddleware, webpackHotMiddleware, webpackConfig;
-if (process.env.NODE_ENV !== "production") {
-  webpack = require("webpack");
-  webpackDevMiddleware = require("webpack-dev-middleware");
-  webpackConfig = require("../../webpack.config");
-  webpackHotMiddleware = require("webpack-hot-middleware");
-}
+const isDevelopment = ():boolean => process.env.NODE_ENV !== "production";
+
+// let webpack, webpackDevMiddleware, webpackHotMiddleware, webpackConfig;
+// if (isDevelopment) {
+//   webpack = require("webpack");
+//   webpackDevMiddleware = require("webpack-dev-middleware");
+//   webpackConfig = require("../../webpack.config");
+//   webpackHotMiddleware = require("webpack-hot-middleware");
+// }
 
 import { Server } from "colyseus";
 import http from "http";
@@ -20,27 +22,41 @@ const app = express();
 const port = Number(process.env.PORT || 8080);
 const endpoint = "localhost";
 
-let STATIC_DIR: string;
-
 const gameServer = new Server({
   server: http.createServer(app)
 });
 
-if (process.env.NODE_ENV !== "production") {
+if (isDevelopment()) {
+  const webpack = require("webpack");
+  const webpackDevMiddleware = require("webpack-dev-middleware");
+  const webpackConfig = require("../../webpack.config");
+  const webpackHotMiddleware = require("webpack-hot-middleware");
   const webpackCompiler = webpack(webpackConfig({}));
+
   app.use(webpackDevMiddleware(webpackCompiler, {}));
   app.use(webpackHotMiddleware(webpackCompiler));
-
-  // on development, use "../../" as static root
-  STATIC_DIR = path.resolve(__dirname, "..", "..");
-} else {
-  // on production, use ./public as static root
-  STATIC_DIR = path.resolve(__dirname, "..", "..", "public");
 }
 
 app.use(cookieParser());
 app.use(express.json());
-app.use("/", express.static(STATIC_DIR));
+
+if (isDevelopment()) {
+  // on development, use "../../" as static root
+  app.use("/", express.static(path.resolve(__dirname, "..", "..")));
+
+  // on development, set simulated latency for game server
+  gameServer.simulateLatency(constants.SIMULATED_LATENCY);
+} else {
+  // on production, use ./public as static root
+  app.use("/", express.static(path.resolve(__dirname, "..", "..", "public")));
+  // on production, use ../assets as static root
+  app.use("/assets", express.static(path.resolve(__dirname, "..", "..", "..", "assets")));
+
+  // on production, serve index html file on root
+  app.get('/', (req, res) => {
+    res.sendFile(path.resolve(__dirname, "..", "..", "public", 'index.html'));
+  });
+}
 
 app.post('/login', (req, res) => {
   console.log(req.body);
@@ -52,19 +68,7 @@ app.post('/login', (req, res) => {
   res.send({ success: true });
 });
 
-if (process.env.NODE_ENV === "production") {
-  app.get('/', (req, res) => {
-    res.sendFile(path.resolve(__dirname, "..", "..", "public", 'index.html'));
-  });
-}
-
 gameServer.define(constants.ROOM_NAME, ArenaRoom);
 gameServer.listen(port);
-
-if (process.env.NODE_ENV !== "production") {
-  // const latencyOffset = Math.floor(Math.random() * 40);
-  // gameServer.simulateLatency(100 - latencyOffset);
-  gameServer.simulateLatency(constants.SIMULATED_LATENCY);
-}
 
 console.log(`Listening on http://${endpoint}:${port}`);

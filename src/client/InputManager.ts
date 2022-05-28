@@ -1,6 +1,4 @@
-import { TimingGraph, TimingEventType } from "./TimingGraph";
 import type { Room } from "colyseus.js";
-
 
 export enum UserActions {
   PLAYER_UP = "PLAYER_UP",
@@ -24,7 +22,7 @@ const UserActionsNetworked: UserActions[] = [
   UserActions.INTERACT,
 ];
 
-export class Keyboard {
+export class InputManager {
 
   private keyMap: { [key in UserActions]: string } = {
     [UserActions.PLAYER_UP]: "w",
@@ -76,10 +74,8 @@ export class Keyboard {
   }
 
   // -----------------------------------------------------------------------------------------------
-  public tick(room: Room, timingGraph: TimingGraph) {
+  public tick(room: Room) {
     if (!this.state.DIRTY) return;
-
-    const _tickComplete = timingGraph.addTimingEventCallback(TimingEventType.SEND_USER_ACTION);
 
     const message: { [key in UserActions]?: boolean } = {};
     const stateUserActions = Object.entries(this.state) as [UserActions, boolean][];
@@ -90,11 +86,8 @@ export class Keyboard {
       }
     });
 
-    // console.log('Send Keyboard State', message);
     room.send('user_action', message);
 
     this.state.DIRTY = false;
-
-    _tickComplete();
   }
 }

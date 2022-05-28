@@ -13,6 +13,7 @@ export enum LogCodes {
   CLIENT_ENTITY_INTERP = "CLIENT_ENTITY_INTERP",
   CLIENT_ENTITY_INFO = "CLIENT_ENTITY_INFO",
   CLIENT_ENTITY_ERROR = "CLIENT_ENTITY_ERROR",
+  CLIENT_APPLICATION = "CLIENT_APPLICATION",
 }
 
 const log = (level: LogLevels, message: string, logCode: LogCodes, data?: any): void => {

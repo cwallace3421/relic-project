@@ -1,7 +1,5 @@
 import { DataChange } from "@colyseus/schema";
-import { lerp, lerpAngle } from "../utils/vector";
-import logger, { LogCodes } from "../utils/logger";
-import constants from "../utils/constants";
+import { lerp, lerpAngle } from "../../../utils/vector";
 
 export type EntityStateChange = {
   entityId: string;

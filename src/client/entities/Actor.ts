@@ -1,8 +1,7 @@
-import type * as Viewport from "pixi-viewport";
-import * as PIXI from "pixi.js";
-import { EntityStateChange, _NetworkedEntity } from "./_NetworkedEntity";
-import logger, { LogCodes } from "../utils/logger";
-import constants from "../utils/constants";
+import Phaser from 'phaser';
+import { EntityStateChange, _NetworkedEntity } from "./base/_NetworkedEntity";
+import logger, { LogCodes } from "../../utils/logger";
+import constants from '../../utils/constants';
 
 export enum ActorType {
   PLAYER = "PLAYER",
@@ -16,18 +15,17 @@ export class Actor extends _NetworkedEntity {
   private name: string;
   private isClient: boolean;
 
-  private viewport: Viewport;
-  private graphics: PIXI.Graphics;
+  private scene: Phaser.Scene;
+  private container: Phaser.GameObjects.Container;
 
   private speed: number;
   private radius: number;
   private color: number;
 
   // -----------------------------------------------------------------------------------------------
-  constructor (viewport: Viewport) {
+  constructor (scene: Phaser.Scene) {
     super();
-
-    this.viewport = viewport;
+    this.scene = scene;
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -49,7 +47,7 @@ export class Actor extends _NetworkedEntity {
   public initGraphics(x: number, y: number, radius: number, color: number): Actor {
     this.radius = radius;
     this.color = color;
-    this.graphics = this.createGraphics(x, y);
+    this.createGraphics(x, y);
     return this;
   }
 
@@ -61,8 +59,8 @@ export class Actor extends _NetworkedEntity {
   // @Override -------------------------------------------------------------------------------------
   public onEntityRemove(id: string): void {
     if (id === this.id) {
-      this.viewport.removeChild(this.graphics);
-      this.graphics.destroy();
+      this.container.destroy();
+      delete this.container;
       logger.info("Actor Entity Removed.", LogCodes.CLIENT_ENTITY_INFO, { id: this.id });
     } else {
       logger.info("Trying to remove Actor Entity with incorrect id.", LogCodes.CLIENT_ENTITY_INFO, { id: this.id, providedId: id });
@@ -71,12 +69,12 @@ export class Actor extends _NetworkedEntity {
 
   // @Override -------------------------------------------------------------------------------------
   public setX(x: number): void {
-    this.graphics.x = x;
+    this.container.x = x;
   }
 
   // @Override -------------------------------------------------------------------------------------
   public setY(y: number): void {
-    this.graphics.y = y;
+    this.container.y = y;
   }
 
   // @Override -------------------------------------------------------------------------------------
@@ -84,12 +82,12 @@ export class Actor extends _NetworkedEntity {
 
   // @Override -------------------------------------------------------------------------------------
   public getX(): number {
-    return this.graphics.x;
+    return this.container.x;
   }
 
   // @Override -------------------------------------------------------------------------------------
   public getY(): number {
-    return this.graphics.y;
+    return this.container.y;
   }
 
   // @Override -------------------------------------------------------------------------------------
@@ -108,38 +106,22 @@ export class Actor extends _NetworkedEntity {
   }
 
   // -----------------------------------------------------------------------------------------------
-  private createGraphics(x: number, y: number): PIXI.Graphics {
-    const gfx = new PIXI.Graphics();
-    gfx.lineStyle(0);
+  private createGraphics(x: number, y: number): void {
+    const circle = this.scene.add.ellipse(0, 0, this.radius * 2, this.radius * 2, this.color);
+    this.container = this.scene.add.container(x, y, [circle]);
 
     if (this.isClient) {
-      gfx.beginFill(0xffffff, 0.1);
-      gfx.drawCircle(0, 0, constants.DEFLECT_RADIUS);
-      gfx.endFill();
+      const deflect = this.scene.add.ellipse(0, 0, constants.DEFLECT_RADIUS * 2, constants.DEFLECT_RADIUS * 2, 0xffffff, 0.1);
+      this.container.add(deflect);
     }
 
-    gfx.beginFill(this.color);
-    gfx.drawCircle(0, 0, this.radius);
-    gfx.endFill();
-
-    gfx.x = x;
-    gfx.y = y;
-
-    this.viewport.addChild(gfx);
-
-    const textStyle = new PIXI.TextStyle({
-      fill: "white",
+    const nameplate = this.scene.add.text(0, -(this.radius * 2) ,this.name, {
+      color: "rgb(255,255,255)",
       align: "center",
-      fontSize: 12
-    });
+      fontSize: '12'
+    }).setOrigin(0.5, 0.5);
 
-    const text = new PIXI.Text(this.name, textStyle);
-    text.anchor.set(0.5, 1);
-    text.position.set(0, -(this.radius * 2));
-
-    gfx.addChild(text);
-
-    return gfx;
+    this.container.add(nameplate);
   }
 
 }

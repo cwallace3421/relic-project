@@ -10,11 +10,17 @@
     ],
     "target": "es2017",
     "declaration": false,
-    "allowSyntheticDefaultImports": false,
-    "esModuleInterop": false,
+		"esModuleInterop": true,
     "noImplicitAny": false,
     "inlineSourceMap": true
   },
+  "typeRoots": [
+    "node_modules/@types",
+    "node_module/phaser/types"
+  ],
+  "types": [
+    "Phaser"
+  ],
   "include": [
     "./src/client/**/*.ts",
     "./src/utils/**/*.ts",

@@ -1,16 +1,13 @@
-import * as PIXI from "pixi.js";
-import * as Viewport from "pixi-viewport";
+import Phaser from 'phaser';
 import { Room, Client } from "colyseus.js";
-import type { ArenaState } from "../server/rooms/ArenaState";
-import { PingPong } from "./PingPong";
-import { TimingGraph, TimingEventType } from "./TimingGraph";
-import constants from "../utils/constants";
-import { Keyboard, UserActions } from "./Keyboard";
-import { Actor, ActorType } from "./Actor";
-import { Rocket } from "./Rocket";
+import { Actor, ActorType } from "./entities/Actor";
+import { Rocket } from "./entities/Rocket";
+import { InputManager, UserActions } from './InputManager';
 import logger, { LogCodes } from "../utils/logger";
+import constants from '../utils/constants';
 
-const ENDPOINT = `wss://${window.location.host}`;
+import type { ArenaState } from "../server/rooms/ArenaState";
+import { PingManager } from './PingManager';
 
 enum WorldEntityType {
   PLAYER = "PLAYER",
@@ -27,105 +24,64 @@ type WorldEntity = {
   entity: Actor | Rocket;
 };
 
-// interface ServerEntity {
-//   type: ServerEntityType;
-//   speed: number;
-//   positionBuffer: {
-//     id: number;
-//     timestamp: number;
-//     timeElapsed?: number;
-//     speed?: number;
-//     x?: number;
-//     y?: number;
-//   }[];
-//   gfx: PIXI.Graphics;
-//   flag?: boolean;
-// };
+export default class ArenaScene extends Phaser.Scene {
 
-// interface ServerEntityMap {
-//   [id: string]: ServerEntity
-// };
+  private client: Client;
+  private room: Room;
 
+  private worldEntityMap: WorldEntityMap;
+  private clientEntity: WorldEntity;
 
+  private inputManager: InputManager;
+  private pingManager: PingManager;
 
-export class Application extends PIXI.Application {
-  worldEntityMap: WorldEntityMap = {};
-  clientEntity: WorldEntity;
-
-  client: Client = new Client(ENDPOINT);
-  room: Room<ArenaState>;
-
-  viewport: Viewport;
-
-  keyboard: Keyboard;
-  pingPong: PingPong;
-  timingGraph: TimingGraph;
-
-  boundaries: PIXI.Graphics;
+  private playarea: Phaser.GameObjects.Rectangle;
 
   // -----------------------------------------------------------------------------------------------
   constructor() {
-    super({
-      width: window.innerWidth,
-      height: window.innerHeight,
-      backgroundColor: 0x0c0c0c
-    });
+    super({ key: 'arena-scene' });
+  }
 
-    this.viewport = new Viewport({
-      screenWidth: window.innerWidth,
-      screenHeight: window.innerHeight,
-      worldWidth: constants.WORLD_SIZE,
-      worldHeight: constants.WORLD_SIZE,
-    });
+  init() {
+    logger.info('Function: init', LogCodes.CLIENT_APPLICATION);
+    const protocol = window.location.host.includes('localhost') ? 'ws' : 'wss';
+    const endpoint = `${protocol}://${window.location.host}`;
+    this.client = new Client(endpoint);
 
-    // draw boundaries of the world
-    this.boundaries = new PIXI.Graphics();
-    this.boundaries.beginFill(0x000000);
-    this.boundaries.drawRoundedRect(0, 0, constants.WORLD_SIZE, constants.WORLD_SIZE, 30);
-    this.viewport.addChild(this.boundaries);
+    this.worldEntityMap = {};
 
-    this.boundaries.lineStyle(1, 0xffb3f6);
+    this.inputManager = new InputManager((action: UserActions) => {});
+    this.pingManager = new PingManager(true, this);
 
-    // add viewport to stage
-    this.stage.addChild(this.viewport);
-
-    this.authenticate();
-
-    // this.ticker.maxFPS = 120;
-    // this.ticker.minFPS = 30;
-    // requestAnimationFrame(() => {})
-    // this.ticker.add(this.tick.bind(this));
-
-    requestAnimationFrame(this.loop.bind(this));
-
-    this.pingPong = new PingPong(true, this.stage);
-    this.timingGraph = new TimingGraph(false, this.stage);
-
-    this.keyboard = new Keyboard((action: UserActions) => {
-      if (action === UserActions.ZOOM_IN) this.timingGraph.changeGraphScale(1);
-      if (action === UserActions.ZOOM_OUT) this.timingGraph.changeGraphScale(-1);
-      if (action === UserActions.TOGGLE_TIMING_GRAPH) this.timingGraph.toggleEnabled();
-    });
-
-    // this.interpolation = false;
+    this.resize();
+    this.scale.on('resize', this.resize.bind(this));
   }
 
   // -----------------------------------------------------------------------------------------------
-  async authenticate() {
-    // anonymous auth for social
-    // await this.client.auth.login();
+  preload() {
+    logger.info('Function: preload', LogCodes.CLIENT_APPLICATION);
+    this.load.bitmapFont('syne', 'assets/fonts/syne_mono_24/syne_mono_24.png', 'assets/fonts/syne_mono_24/syne_mono_24.xml');
+    this.load.bitmapFont('syne', 'assets/fonts/syne_mono_32/syne_mono_32.png', 'assets/fonts/syne_mono_32/syne_mono_32.xml');
+    this.load.bitmapFont('syne', 'assets/fonts/syne_mono_64/syne_mono_64.png', 'assets/fonts/syne_mono_64/syne_mono_64.xml');
+  }
 
-    // console.log("Success!", this.client.auth);
+  // -----------------------------------------------------------------------------------------------
+  async create() {
+    logger.info('Function: create', LogCodes.CLIENT_APPLICATION);
+
+    this.playarea = this.add.rectangle(0, 0, constants.WORLD_SIZE, constants.WORLD_SIZE, 0x000000).setOrigin(0, 0);
 
     const playerName = (window as any).custom.name;
     this.room = await this.client.joinOrCreate<ArenaState>(constants.ROOM_NAME, { name: playerName });
+
+    this.pingManager.start(this.room);
 
     // PLAYERS ------
     this.room.state.players.onAdd = (playerServerEntity, sessionId: string) => {
       logger.info('Player joined the game', LogCodes.CLIENT_ENTITY_INFO, { ...playerServerEntity });
 
       const isClient = sessionId === this.room.sessionId;
-      const actor = new Actor(this.viewport)
+      const actor = new Actor(this)
         .initMeta(ActorType.PLAYER, isClient, sessionId, playerServerEntity.name)
         .initGraphics(playerServerEntity.x, playerServerEntity.y, playerServerEntity.radius, 0xFFFF0B)
         .initProperties(playerServerEntity.speed);
@@ -153,7 +109,7 @@ export class Application extends PIXI.Application {
 
     // BOTS ------
     this.room.state.bots.onAdd = (botServerEntity, botId) => {
-      const actor = new Actor(this.viewport)
+      const actor = new Actor(this)
         .initMeta(ActorType.BOT, false, botId, botServerEntity.name)
         .initGraphics(botServerEntity.x, botServerEntity.y, botServerEntity.radius, 0xFF550B)
         .initProperties(botServerEntity.speed);
@@ -176,7 +132,7 @@ export class Application extends PIXI.Application {
 
     // ROCKETS ------
     this.room.state.rockets.onAdd = (rocketServerEntity, rocketId: string) => {
-      const rocket = new Rocket(this.viewport)
+      const rocket = new Rocket(this)
         .initGraphics(rocketServerEntity.x, rocketServerEntity.y, rocketServerEntity.radius, 0xFF0000)
         .initMeta(rocketId)
         .initProperties(rocketServerEntity.speed);
@@ -196,38 +152,22 @@ export class Application extends PIXI.Application {
         }
       };
     };
-
-    this.pingPong.start(this.room);
   }
 
   // -----------------------------------------------------------------------------------------------
-  tick(deltaTime: number) {
-    const _tickComplete = this.timingGraph.addTimingEventCallback(TimingEventType.TICK);
-
-    this.keyboard.tick(this.room, this.timingGraph);
+  update(time: number, delta: number): void {
+    this.inputManager.tick(this.room);
 
     for (const entityId in this.worldEntityMap) {
       const entity = this.worldEntityMap[entityId].entity;
-      entity.onTick(deltaTime);
+      entity.onTick(delta);
     }
 
-    this.pingPong.tick();
-    this.timingGraph.tick();
-
-    _tickComplete();
+    this.pingManager.tick();
   }
 
   // -----------------------------------------------------------------------------------------------
-  private lastTime: number;
-  loop(now: number) {
-    if(!this.lastTime) {
-      this.lastTime = now;
-    }
-
-    this.tick(now - this.lastTime);
-
-    this.lastTime = now;
-
-    requestAnimationFrame(this.loop.bind(this));
+  resize(): void {
+    this.cameras.main.setScroll(-(this.scale.width / 2) + (constants.WORLD_SIZE / 2), -(this.scale.height / 2) + (constants.WORLD_SIZE / 2));
   }
 }
