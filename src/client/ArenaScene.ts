@@ -37,6 +37,9 @@ export default class ArenaScene extends Phaser.Scene {
 
   private playarea: Phaser.GameObjects.Rectangle;
 
+  private labelPhaseTimer: Phaser.GameObjects.BitmapText;
+  private labelPhaseType: Phaser.GameObjects.BitmapText;
+
   // -----------------------------------------------------------------------------------------------
   constructor() {
     super({ key: 'arena-scene' });
@@ -70,11 +73,23 @@ export default class ArenaScene extends Phaser.Scene {
     logger.info('Function: create', LogCodes.CLIENT_APPLICATION);
 
     this.playarea = this.add.rectangle(0, 0, constants.WORLD_SIZE, constants.WORLD_SIZE, 0x000000).setOrigin(0, 0);
+    this.labelPhaseTimer = this.add.bitmapText(constants.WORLD_SIZE, 32, 'syne', '', 24).setOrigin(0, 0);
+    this.labelPhaseType = this.add.bitmapText(constants.WORLD_SIZE, 64, 'syne', '', 24).setOrigin(0, 0);
 
     const playerName = (window as any).custom.name;
     this.room = await this.client.joinOrCreate<ArenaState>(constants.ROOM_NAME, { name: playerName });
 
     this.pingManager.start(this.room);
+
+    this.room.state.meta.onChange = (dataChanges = []) => {
+      dataChanges.forEach((change) => {
+        if (change.field === 'phaseElapsedSeconds') {
+          this.labelPhaseTimer.text = `${change.value}`;
+        } else if (change.field === 'phaseType') {
+          this.labelPhaseType.text = `${change.value}`;
+        }
+      });
+    };
 
     // PLAYERS ------
     this.room.state.players.onAdd = (playerServerEntity, sessionId: string) => {

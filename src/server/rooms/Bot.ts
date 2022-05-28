@@ -27,6 +27,9 @@ export class Bot extends Schema {
   @type("boolean")
   dead: boolean = false;
 
+  @type("boolean")
+  frozen: boolean = false;
+
   @type("float64")
   speed = 0;
 

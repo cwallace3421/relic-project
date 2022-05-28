@@ -2,16 +2,10 @@ import * as http from "http";
 import { Room, Client, Delayed } from "colyseus";
 import { Player } from "./Player";
 import { ArenaState } from "./ArenaState";
-import { onInit, onPlayerAuth, onPlayerJoin, onPlayerLeave, onRocketSpawn, onTick } from "./ArenaLogic";
 import logger, { LogCodes } from "../../utils/logger";
 import constants from "../../utils/constants";
-
-// interface KeyboardMessage {
-//   isUpPressed: boolean;
-//   isDownPressed: boolean;
-//   isLeftPressed: boolean;
-//   isRightPressed: boolean;
-// }
+import { PHASE_NAME } from "../../utils/enums";
+import { ArenaCommon, ArenaCountdown, ArenaFinish, ArenaPhase, ArenaPlaying, ArenaWaiting } from "./phases";
 
 enum UserActions {
   PLAYER_UP = "PLAYER_UP",
@@ -26,13 +20,30 @@ type UserActionMessage = { [key in UserActions]: boolean };
 
 export class ArenaRoom extends Room<ArenaState> {
 
-  public roundTimer!: Delayed;
+  private commonPhase: ArenaPhase;
+  private currentPhase?: ArenaPhase;
 
+  // @Override -------------------------------------------------------------------------------------
   onCreate() {
-    this.setState(new ArenaState());
     this.clock.start();
+    this.setState(new ArenaState());
 
-    onInit(this.state);
+    // Set network patch rate, sends out state updates of the world to the clients.
+    // 20 packets per second - 50 ms
+    this.setPatchRate(constants.NETWORK_BROADCAST_RATE);
+
+    // Set simulation interval, runs the tick loop for the server world.
+    // 60 fps - 16.6 ms
+    this.setSimulationInterval((delta: number) => {
+      const deltaTime: number = delta / 1000;
+
+      const phaseTimeElapsedMilli = this.currentPhase?.getPhaseTimerElapsed() ?? 0;
+      const phaseTimeElapsedSecs = Math.floor(phaseTimeElapsedMilli / 1000);
+      if (this.state.meta.phaseElapsedSeconds !== phaseTimeElapsedSecs) this.state.meta.assign({ phaseElapsedSeconds: phaseTimeElapsedSecs });
+
+      this.commonPhase.onTick(deltaTime);
+      this.currentPhase?.onTick(deltaTime);
+    }, constants.SIMULATION_TICK_RATE);
 
     this.onMessage("user_action", (client: Client, message: UserActionMessage) => {
       this.onUserActionMessage(client, message);
@@ -42,37 +53,28 @@ export class ArenaRoom extends Room<ArenaState> {
       client.send('pong', message);
     });
 
-    this.roundTimer = this.clock.setTimeout(() => {
-      onRocketSpawn(this.state);
-    }, 2000);
-
-    // Set network patch rate, sends out state updates of the world to the clients.
-    // 20 packets per second - 50 ms
-    this.setPatchRate(constants.NETWORK_BROADCAST_RATE);
-
-    // Set simulation interval, runs the tick loop for the server world.
-    // 60 fps - 16.6 ms
-    this.setSimulationInterval((delta: number) => {
-      this.onRoomUpdate(delta);
-    }, constants.SIMULATION_TICK_RATE);
+    this.changePhase(PHASE_NAME.ARENA_WAITING);
+    this.commonPhase = new ArenaCommon(this);
   }
 
-  onAuth(client: Client, options: any, request: http.IncomingMessage) {
-    return onPlayerAuth(client, options, request);
+  // @Override -------------------------------------------------------------------------------------
+  onAuth(client: Client, options: any, request: http.IncomingMessage): boolean {
+    return !!options.name;
   }
 
+  // @Override -------------------------------------------------------------------------------------
   onJoin(client: Client, options: any) {
-    onPlayerJoin(this.state, client, options);
+    this.commonPhase.onPlayerJoin(client, options);
+    this.currentPhase?.onPlayerJoin(client, options);
   }
 
+  // @Override -------------------------------------------------------------------------------------
   onLeave(client: Client) {
-    onPlayerLeave(this.state, client);
+    this.commonPhase.onPlayerLeave(client);
+    this.currentPhase?.onPlayerLeave(client);
   }
 
-  onRoomUpdate(delta: number) {
-    onTick(this.state, delta);
-  }
-
+  // -----------------------------------------------------------------------------------------------
   onUserActionMessage(client: Client, message: UserActionMessage) {
     const player = this.state.players[client.sessionId] as Player;
     if (!player || player.dead === true) {
@@ -86,6 +88,34 @@ export class ArenaRoom extends Room<ArenaState> {
         isInteractPressed: message[UserActions.INTERACT],
       });
     }
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  changePhase(newPhase: PHASE_NAME): void {
+    logger.info(`Changing Phase [${newPhase}]`, LogCodes.ARENA_ROOM);
+
+    switch (newPhase) {
+      case PHASE_NAME.ARENA_WAITING:
+        this.currentPhase = new ArenaWaiting(this);
+        break;
+      case PHASE_NAME.ARENA_COUNTDOWN:
+        this.currentPhase = new ArenaCountdown(this);
+        break;
+      case PHASE_NAME.ARENA_PLAYING:
+        this.currentPhase = new ArenaPlaying(this);
+        break;
+      case PHASE_NAME.ARENA_FINISH:
+        this.currentPhase = new ArenaFinish(this);
+        break;
+    }
+
+    this.state.meta.assign({
+      phaseType: newPhase,
+      phaseDuration: this.currentPhase.getPhaseDuration(),
+      phaseElapsedSeconds: 0
+    });
+
+    this.currentPhase.onPhaseStart();
   }
 
 }

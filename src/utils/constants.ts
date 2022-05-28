@@ -17,4 +17,6 @@ export default {
 
   BOT_ENABLED: true,
   BOT_COUNT: 5,
+
+  ROOM_SIZE: 5,
 };
