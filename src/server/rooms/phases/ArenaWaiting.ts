@@ -20,6 +20,7 @@ export class ArenaWaiting extends ArenaPhase {
   onPhaseStart(): void {
     logger.info("Start Phase", LogCodes.ARENA_STATE_WAITING);
     this.startPhaseTimer();
+    this.reviveAllPlayers();
   }
 
   // @Override -------------------------------------------------------------------------------------
@@ -78,6 +79,15 @@ export class ArenaWaiting extends ArenaPhase {
       difficulty: difficulty,
       speed: constants.PLAYER_SPEED,
     }));
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  reviveAllPlayers(): void {
+    this.room.state.players.forEach((player) => {
+      if (player.dead) {
+        player.assign({ dead: false });
+      }
+    })
   }
 
 }

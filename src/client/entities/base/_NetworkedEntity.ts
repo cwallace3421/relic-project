@@ -15,7 +15,7 @@ export type EntityStateChange = {
 export abstract class _NetworkedEntity {
 
     private changes = {
-      count: 0,
+      increment: 0,
       data: [] as EntityStateChange[],
       elapsed: {} as { [key: string]: number },
     };
@@ -35,6 +35,9 @@ export abstract class _NetworkedEntity {
     public abstract setRotation(degrees: number): void;
 
     // -----------------------------------------------------------------------------------------------
+    public abstract setAlive(isAlive: boolean): void;
+
+    // -----------------------------------------------------------------------------------------------
     public abstract getX(): number;
 
     // -----------------------------------------------------------------------------------------------
@@ -42,6 +45,9 @@ export abstract class _NetworkedEntity {
 
     // -----------------------------------------------------------------------------------------------
     public abstract getRotation(): number;
+
+    // -----------------------------------------------------------------------------------------------
+    public abstract isAlive(): boolean;
 
     // -----------------------------------------------------------------------------------------------
     public onTick(deltaTime: number): void {
@@ -54,6 +60,7 @@ export abstract class _NetworkedEntity {
       let y: number;
       let speed: number;
       let rotation: number;
+      let dead: boolean;
 
       changes.forEach(c => {
         if (c.field === 'x' && c.value) {
@@ -64,27 +71,44 @@ export abstract class _NetworkedEntity {
           rotation = c.value;
         } else if (c.field === 'speed' && c.value) {
           speed = c.value;
+        } else if (c.field === 'dead' && (c.value === true || c.value === false)) {
+          dead = c.value;
         }
       });
 
+      if (dead === true || dead === false) {
+        this.setAlive(!dead);
+      }
+
       if (x || y || speed || rotation) {
-        this.changes.count += 1;
-        const dataToAdd: EntityStateChange = { entityId, timestamp: performance.now(), id: `${this.changes.count}`, x, y, speed, rotation };
+          this.changes.increment += 1;
+          const dataToAdd: EntityStateChange = { entityId, timestamp: performance.now(), id: `${this.changes.increment}`, x, y, speed, rotation };
 
-        const len = this.changes.data.length;
-        if (len > 0) {
-          const lastAddedBuffer = this.changes.data[len - 1];
-          if (dataToAdd.timestamp - lastAddedBuffer.timestamp > 80) {
-            this.changes.data.length = 0;
+          const len = this.changes.data.length;
+          if (len > 0) {
+            const lastAddedBuffer = this.changes.data[len - 1];
+            if (dataToAdd.timestamp - lastAddedBuffer.timestamp > 80) {
+              this.changes.data.length = 0;
+            }
           }
-        }
 
-        this.changes.data.push(dataToAdd);
+          this.changes.data.push(dataToAdd);
       }
     }
 
     // -----------------------------------------------------------------------------------------------
     private interpPositionBuffers(deltaTime: number): void {
+      // If the entity is not alive, do not lerp between packets, just set the values in the packet to the entity and move on.
+      if (!this.isAlive()) {
+        if (this.changes.data.length > 0) {
+          const packet = this.removeFirstChangeData();
+          this.setX(packet.x ?? this.getX());
+          this.setY(packet.y ?? this.getY());
+          this.setRotation(packet.rotation ?? this.getRotation());
+        }
+        return;
+      }
+
       if (this.changes.data.length < 2) return;
       // TODO: Need to be able to support when there is only one packet in the buffer.
 
@@ -145,6 +169,8 @@ export abstract class _NetworkedEntity {
 
     // -----------------------------------------------------------------------------------------------
     private removeFirstChangeData(): EntityStateChange {
-      return this.changes.data.shift();
+      const packet = this.changes.data.shift();
+      if (this.changes.elapsed[packet.id]) delete this.changes.elapsed[packet.id];
+      return packet;
     }
 }

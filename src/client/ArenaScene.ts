@@ -93,7 +93,7 @@ export default class ArenaScene extends Phaser.Scene {
 
     // PLAYERS ------
     this.room.state.players.onAdd = (playerServerEntity, sessionId: string) => {
-      logger.info('Player joined the game', LogCodes.CLIENT_ENTITY_INFO, { ...playerServerEntity });
+      logger.info('Player joined the game.', LogCodes.CLIENT_ENTITY_INFO, { ...playerServerEntity });
 
       const isClient = sessionId === this.room.sessionId;
       const actor = new Actor(this)

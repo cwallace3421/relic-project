@@ -16,7 +16,7 @@ import constants from "../../../utils/constants";
 
 export class ArenaPlaying extends ArenaPhase {
 
-  private static PHASE_DURATION: number = 1 * 60 * 1000; // 3 Minutes
+  private static PHASE_DURATION: number = 3 * 60 * 1000; // 3 Minutes
   private static ROCKET_SPAWN_INTERVAL: number = 2 * 1000; // 2 Seconds
 
   private rocketSpawnTimer: Delayed;
@@ -76,7 +76,9 @@ export class ArenaPlaying extends ArenaPhase {
   onTriggerRocketSpawn(): void {
     logger.info('Attempting to spawn one rocket.', LogCodes.SERVER_ROCKET);
     const state = this.getState();
-    if (state.players.size > 0) {
+    const actorCount = [...state.players.values(), ...state.bots.values()].filter(actor => !actor.dead).length;
+
+    if (actorCount > 1) {
       const rocketId = generateId();
       const targetId = this.getRandomActorId();
       const spawnDirection = Victor.getIdentity().rotateToDeg(randomNumberInRange(0, 360)).normalize(); // TODO: Maybe should spawn pointing at the first target?
@@ -93,6 +95,8 @@ export class ArenaPlaying extends ArenaPhase {
         directionY: spawnDirection.y,
         active: true,
       }));
+    } else if (actorCount > 0) {
+      this.onPhaseEnd(); // TODO: This means the phase will only end when the rocket spawn timer is finished. So there is a small delay from the 2nd to last person dying and this triggering.
     } else {
       logger.error('Unable to spawn rocket as there is no players.', LogCodes.SERVER_ROCKET)
     }
@@ -107,8 +111,8 @@ export class ArenaPlaying extends ArenaPhase {
     }
 
     const targetActor = this.getActor(targetId);
-    if (!targetActor) {
-      logger.error('Rocket target id does not point to a existing player. Retargeting.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, targetId });
+    if (!targetActor || targetActor.dead) {
+      logger.error('Rocket target id does not point to an alive or existing player. Retargeting.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, targetId });
       this.retargetRocket(rocket);
       return;
     }
@@ -145,7 +149,8 @@ export class ArenaPlaying extends ArenaPhase {
       this.room.state.rockets.delete(rocket.id);
       this.rocketSpawnTimer.clear();
       this.rocketSpawnTimer = this.room.clock.setTimeout(this.onTriggerRocketSpawn.bind(this), ArenaPlaying.ROCKET_SPAWN_INTERVAL);
-      // TODO: Kill collided target
+      logger.info('Rocket has collided with an actor, killing them.', LogCodes.SERVER_ROCKET, { rocketId: rocket.id, actorId: targetActor.id });
+      targetActor.assign({ dead: true });
     }
   }
 
@@ -167,8 +172,8 @@ export class ArenaPlaying extends ArenaPhase {
   getRandomActorId(exclude: Array<string> = []): string | undefined {
     const state = this.getState();
 
-    const playerIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.players.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: ACTOR_TYPE.PLAYER }));
-    const botIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.bots.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: ACTOR_TYPE.BOT }));
+    const playerIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.players.values()].filter((player) => !exclude.includes(player.id) && !player.dead).map((player) => ({ id: player.id, type: ACTOR_TYPE.PLAYER }));
+    const botIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.bots.values()].filter((bot) => !exclude.includes(bot.id) && !bot.dead).map((bot) => ({ id: bot.id, type: ACTOR_TYPE.BOT }));
     const idMap = [...playerIdMap, ...botIdMap]; // [...playerIdMap, ...botIdMap];
 
     if (idMap.length === 0) return;

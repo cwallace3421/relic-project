@@ -13,7 +13,7 @@ export class PingManager {
   private enabled: boolean = false;
 
   private pings: PingData[] = [];
-  private pingsMaxLength: number = 10;
+  private pingsMaxLength: number = 4;
   private isDirty: boolean = false;
 
   private interval: number = 100;
@@ -50,7 +50,7 @@ export class PingManager {
     room.onMessage('pong', (message: PingData) => {
       message.messageRecievedByClient = Date.now();
 
-      // If there is more than 9 elements in the pings array. Remove the first element so we will have 10 total.
+      // If there is more than 3 elements in the pings array. Remove the first element so we will have 4 total.
       if (this.pings.length > (this.pingsMaxLength - 1)) {
         this.pings.shift();
       }

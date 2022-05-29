@@ -50,17 +50,15 @@ export class ArenaCommon extends ArenaPhase {
     const state = this.getState();
 
     state.players.forEach((player) => {
-      this.onPlayerUpdate(player, delta);
-    });
-    // TODO: Check frozen flag for players and bots.
-    state.players.forEach((player) => {
-      if (player.dead) {
-        state.players.delete(player.id);
+      if (!player.dead && !player.frozen) {
+        this.onPlayerUpdate(player, delta);
       }
     });
 
     state.bots.forEach((bot) => {
-      this.onBotUpdate(bot, delta);
+      if (!bot.dead && !bot.frozen) {
+        this.onBotUpdate(bot, delta);
+      }
     });
   }
 
@@ -76,8 +74,6 @@ export class ArenaCommon extends ArenaPhase {
 
   // -----------------------------------------------------------------------------------------------
   onPlayerUpdate(player: Player, delta: number): void {
-    if (player.frozen) return;
-
     // Player Movement
     const moveDirection = new Victor(0, 0);
 
@@ -120,12 +116,13 @@ export class ArenaCommon extends ArenaPhase {
 
   // -----------------------------------------------------------------------------------------------
   onBotUpdate(bot: Bot, delta: number): void {
-    if (bot.frozen) return;
-
     const botPosition = bot.getPosition();
     const targetPosition = bot.getTargetPosition();
 
-    this.deflectRockets(bot);
+    const deflectRocketChance = Math.floor(Math.random() * 200);
+    if (deflectRocketChance > 180) {
+      this.deflectRockets(bot);
+    }
 
     const speed = bot.speed * delta;
     const minBounds = bot.radius;
@@ -187,8 +184,8 @@ export class ArenaCommon extends ArenaPhase {
   getRandomActorId(exclude: Array<string> = []): string | undefined {
     const state = this.getState();
 
-    const playerIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.players.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: ACTOR_TYPE.PLAYER }));
-    const botIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.bots.keys()].filter((id) => !exclude.includes(id)).map((id) => ({ id, type: ACTOR_TYPE.BOT }));
+    const playerIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.players.values()].filter((player) => !exclude.includes(player.id) && !player.dead).map((player) => ({ id: player.id, type: ACTOR_TYPE.PLAYER }));
+    const botIdMap: { id: string, type: ACTOR_TYPE }[] = [...state.bots.values()].filter((bot) => !exclude.includes(bot.id) && !bot.dead).map((bot) => ({ id: bot.id, type: ACTOR_TYPE.BOT }));
     const idMap = [...playerIdMap, ...botIdMap]; // [...playerIdMap, ...botIdMap];
 
     if (idMap.length === 0) return;

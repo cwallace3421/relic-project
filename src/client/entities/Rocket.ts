@@ -73,6 +73,11 @@ export class Rocket extends _NetworkedEntity {
   }
 
   // @Override -------------------------------------------------------------------------------------
+  public setAlive(isAlive: boolean): void {
+    throw new Error("Method not implemented.");
+  }
+
+  // @Override -------------------------------------------------------------------------------------
   public getX(): number {
     return this.container.x;
   }
@@ -85,6 +90,11 @@ export class Rocket extends _NetworkedEntity {
   // @Override -------------------------------------------------------------------------------------
   public getRotation(): number {
     return this.rotation;
+  }
+
+  // @Override -------------------------------------------------------------------------------------
+  public isAlive(): boolean {
+    return true;
   }
 
   // -----------------------------------------------------------------------------------------------

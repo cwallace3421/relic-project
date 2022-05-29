@@ -21,6 +21,7 @@ export class Actor extends _NetworkedEntity {
   private speed: number;
   private radius: number;
   private color: number;
+  private alive: boolean = true;
 
   // -----------------------------------------------------------------------------------------------
   constructor (scene: Phaser.Scene) {
@@ -81,6 +82,16 @@ export class Actor extends _NetworkedEntity {
   public setRotation(degrees: number): void { }
 
   // @Override -------------------------------------------------------------------------------------
+  public setAlive(isAlive: boolean): void {
+    if (this.alive !== isAlive && isAlive) { // Revive
+      this.reviveActor();
+    } else if (this.alive !== isAlive && !isAlive) { // Kill
+      this.killActor();
+    }
+    this.alive = isAlive;
+  }
+
+  // @Override -------------------------------------------------------------------------------------
   public getX(): number {
     return this.container.x;
   }
@@ -96,9 +107,12 @@ export class Actor extends _NetworkedEntity {
   }
 
   // @Override -------------------------------------------------------------------------------------
-  public onTickDataChange(change: EntityStateChange): void {
-
+  public isAlive(): boolean {
+    return this.alive;
   }
+
+  // @Override -------------------------------------------------------------------------------------
+  public onTickDataChange(change: EntityStateChange): void { }
 
   // -----------------------------------------------------------------------------------------------
   public getIsClient(): boolean {
@@ -122,6 +136,18 @@ export class Actor extends _NetworkedEntity {
     }).setOrigin(0.5, 0.5);
 
     this.container.add(nameplate);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  private killActor(): void {
+    this.container.setVisible(false);
+    this.container.setActive(false);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  private reviveActor(): void {
+    this.container.setVisible(true);
+    this.container.setActive(true);
   }
 
 }
